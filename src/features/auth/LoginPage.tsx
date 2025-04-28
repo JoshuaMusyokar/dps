@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLoginMutation } from "../../store/apis/public-api";
+import { useAppDispatch } from "../../hooks";
+import { setCredentials } from "../../store/slices/auth-slice";
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -8,45 +11,76 @@ const LoginPage: React.FC = () => {
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [login, { isLoading: isLoginLoading }] = useLoginMutation();
+  const dispatch = useAppDispatch();
 
   const navigate = useNavigate();
-
+  const organizationId = "9a637bd7ad444a7d8902f50e77fed73f";
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      // First step of authentication - email and password
-      if (!showTwoFactor) {
-        // Simulate API call to authenticate
-        const response = await fakeAuthApi(email, password);
-
-        if (response.requiresTwoFactor) {
-          setShowTwoFactor(true);
-          // In a real app, this would trigger sending a 2FA code to the user
-        } else {
-          // Direct login if 2FA not required
-          //   handleSuccessfulLogin(response.token);
-        }
-      } else {
-        // Second step - 2FA verification
-        const response = await fakeTwoFactorVerify(email, twoFactorCode);
-        handleSuccessfulLogin(response.token);
-      }
-    } catch (err: any) {
-      setError(err.message || "Authentication failed");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSuccessfulLogin = (token: string) => {
-    // Store the token
-    localStorage.setItem("authToken", token);
-    // Redirect to dashboard
+    const response = await login({
+      organization_id: organizationId,
+      email_address: email,
+      password,
+    }).unwrap();
+    dispatch(
+      setCredentials({
+        token: response.token_details.access_token,
+        issuedAt: response.token_details.issued_at,
+        expiryAt: response.token_details.expires_at,
+        user: response.user_details,
+      })
+    );
     navigate("/dashboard");
+    // No need for try/catch - errors are handled centrally
   };
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setError(null);
+  //   setIsLoading(true);
+
+  //   try {
+  //     // First step of authentication - email and password
+  //     // if (!showTwoFactor) {
+  //     //   const response = await login({organization_id:organizationId,email_address:email, password }).unwrap()
+  //     //   dispatch(setCredentials({
+  //     //     token: response.token_details.access_token,
+  //     //     issuedAt: response.token_details.issued_at,
+  //     //     expiryAt: response.token_details.expires_at,
+  //     //     user: response.user_details,
+  //     //   }))
+
+  //     //   // if (response.requiresTwoFactor) {
+  //     //   //   setShowTwoFactor(true);
+  //     //   //   // In a real app, this would trigger sending a 2FA code to the user
+  //     //   // } else {
+  //     //   //   // Direct login if 2FA not required
+  //     //   //   //   handleSuccessfulLogin(response.token);
+  //     //   // }
+  //     // } else {
+  //     //   // Second step - 2FA verification
+  //     //   const response = await fakeTwoFactorVerify(email, twoFactorCode);
+  //     //   handleSuccessfulLogin(response.token);
+  //     // }
+  //     const response = await login({
+  //       organization_id: organizationId,
+  //       email_address: email,
+  //       password,
+  //     }).unwrap();
+  //     dispatch(
+  //       setCredentials({
+  //         token: response.token_details.access_token,
+  //         issuedAt: response.token_details.issued_at,
+  //         expiryAt: response.token_details.expires_at,
+  //         user: response.user_details,
+  //       })
+  //     );
+  //   } catch (err: any) {
+  //     setError(err.message || "Authentication failed");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   // Mock API functions
   const fakeAuthApi = async (email: string, password: string) => {
@@ -190,12 +224,12 @@ const LoginPage: React.FC = () => {
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoginLoading}
                 className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                  isLoading ? "opacity-70 cursor-not-allowed" : ""
+                  isLoginLoading ? "opacity-70 cursor-not-allowed" : ""
                 }`}
               >
-                {isLoading
+                {isLoginLoading
                   ? "Processing..."
                   : showTwoFactor
                   ? "Verify"

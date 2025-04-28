@@ -1,11 +1,10 @@
 import { DashboardLayout } from "../../components/layouts/DashboardLayout";
-import ApiGateway from "./ApiGateway";
+import Settings from "./Settings";
 
-const ApiKeysIntegrationsPage = () => {
+export const SettingsPage = () => {
   return (
     <DashboardLayout>
-      <ApiGateway />
+      <Settings />
     </DashboardLayout>
   );
 };
-export default ApiKeysIntegrationsPage;

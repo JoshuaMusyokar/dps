@@ -13,6 +13,7 @@ import { RootState } from "../../store";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../../store/slices/auth-slice";
 import { useState } from "react";
+import Avatar from "../ui/Avatar";
 
 export const Topbar = () => {
   const dispatch = useDispatch();
@@ -63,30 +64,14 @@ export const Topbar = () => {
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="relative h-10 w-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
               >
-                <div className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
-                  {user?.avatar ? (
-                    <img
-                      src={user.avatar}
-                      alt={user.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm font-medium text-gray-600">
-                      {user?.name ? (
-                        user.name.charAt(0).toUpperCase()
-                      ) : (
-                        <User />
-                      )}
-                    </span>
-                  )}
-                </div>
+                <Avatar user={user} size="lg" />
               </button>
 
               {isDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none z-50">
                   <div className="px-4 py-3">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {user?.name || "User"}
+                      {user?.first_name || "User"}
                     </p>
                     <p className="text-xs text-gray-500 truncate">
                       {user?.email || "user@example.com"}

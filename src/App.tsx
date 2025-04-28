@@ -14,6 +14,8 @@ import CustomerPage from "./features/UserManagement/CustomerPage";
 import { Provider } from "react-redux";
 import { store } from "./store";
 import { NotFoundPage } from "./features/error/NotFound";
+import { SettingsPage } from "./features/settings/SettingsPage";
+import Unauthorized from "./features/auth/AuthorizationPage";
 
 function App() {
   return (
@@ -30,6 +32,7 @@ function App() {
           />
 
           <Route path="/checkout" element={<PaymentPage />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
           <Route
             path="/business-registration"
             element={<BusinessRegistrationPage />}
@@ -41,6 +44,7 @@ function App() {
           />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/api" element={<ApiKeysIntegrationsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/rbac" element={<RBACPage />} />
           <Route path="/customers" element={<CustomerPage />} />
           <Route path="*" element={<NotFoundPage />} />
