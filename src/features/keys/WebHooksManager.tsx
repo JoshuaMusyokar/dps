@@ -141,16 +141,17 @@ const WebhooksManager: React.FC = () => {
 
   // Function to get badge color for delivery status
   const getStatusColor = (status: string | undefined) => {
-    if (!status) return "bg-gray-100 text-gray-800";
+    if (!status)
+      return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700";
     switch (status) {
       case "success":
-        return "bg-green-100 text-green-800";
+        return "bg-success-100 dark:bg-success-900/20 text-success-800 dark:text-success-400 border-success-200 dark:border-success-800/30";
       case "failed":
-        return "bg-red-100 text-red-800";
+        return "bg-error-100 dark:bg-error-900/20 text-error-800 dark:text-error-400 border-error-200 dark:border-error-800/30";
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-warning-100 dark:bg-warning-900/20 text-warning-800 dark:text-warning-400 border-warning-200 dark:border-warning-800/30";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700";
     }
   };
 
@@ -158,63 +159,65 @@ const WebhooksManager: React.FC = () => {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">Webhooks</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+            Webhooks
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Receive real-time notifications about events in your payment gateway
           </p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="mt-3 sm:mt-0 flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          className="mt-3 sm:mt-0 flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-primary-600 dark:bg-dark-primary-600 hover:bg-primary-700 dark:hover:bg-dark-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-primary-500 dark:focus:ring-dark-primary-400 transition-all duration-200"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Webhook
         </button>
       </div>
 
-      <div className="mt-4 bg-white shadow overflow-hidden rounded-lg">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+      <div className="mt-4 bg-white dark:bg-gray-800 shadow-soft dark:shadow-glass-dark border border-gray-200 dark:border-gray-700 overflow-hidden rounded-lg">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800/50">
               <tr>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
                   Endpoint URL
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
                   Events
                 </th>
                 <th
                   scope="col"
-                  className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
                   Status
                 </th>
                 <th
                   scope="col"
-                  className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
                   Last Delivery
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {webhooks.length === 0 ? (
                 <tr>
                   <td
                     colSpan={5}
-                    className="px-4 py-4 text-center text-gray-500"
+                    className="px-4 py-4 text-center text-gray-500 dark:text-gray-400"
                   >
                     No webhooks found. Add your first webhook using the button
                     above.
@@ -222,51 +225,54 @@ const WebhooksManager: React.FC = () => {
                 </tr>
               ) : (
                 webhooks.map((webhook) => (
-                  <tr key={webhook.id}>
-                    <td className="px-4 py-4 text-sm font-medium text-gray-900 max-w-xs truncate">
+                  <tr
+                    key={webhook.id}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors duration-200"
+                  >
+                    <td className="px-4 py-4 text-sm font-medium text-gray-900 dark:text-gray-100 max-w-xs truncate">
                       {webhook.url}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-500">
+                    <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex flex-wrap gap-1">
-                        {webhook.events.map((event) => (
+                        {webhook.events.slice(0, 3).map((event) => (
                           <span
                             key={event}
-                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-100 dark:bg-dark-primary-900/20 text-primary-800 dark:text-dark-primary-400 border border-primary-200 dark:border-dark-primary-800/30"
                           >
                             {event}
                           </span>
                         ))}
                         {webhook.events.length > 3 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border border-gray-200 dark:border-gray-700">
                             +{webhook.events.length - 3} more
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="hidden sm:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       <button
                         onClick={() => toggleWebhookStatus(webhook.id)}
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors duration-200 ${
                           webhook.active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
+                            ? "bg-success-100 dark:bg-success-900/20 text-success-800 dark:text-success-400 border-success-200 dark:border-success-800/30"
+                            : "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700"
                         }`}
                       >
                         {webhook.active ? "Active" : "Inactive"}
                       </button>
                     </td>
-                    <td className="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="hidden md:table-cell px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {webhook.lastDelivery ? (
                         <div>
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(
                               webhook.lastDelivery.status
                             )}`}
                           >
                             {webhook.lastDelivery.status} (
                             {webhook.lastDelivery.responseCode})
                           </span>
-                          <div className="text-xs text-gray-500 mt-1">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             {formatDate(webhook.lastDelivery.timestamp)}
                           </div>
                         </div>
@@ -279,20 +285,20 @@ const WebhooksManager: React.FC = () => {
                         <button
                           onClick={() => testWebhook(webhook.id)}
                           disabled={testingWebhook === webhook.id}
-                          className="text-blue-600 hover:text-blue-900 relative"
+                          className="text-primary-600 dark:text-dark-primary-400 hover:text-primary-900 dark:hover:text-dark-primary-300 relative transition-colors duration-200 disabled:opacity-50"
                           title="Test webhook"
                         >
                           {testingWebhook === webhook.id ? (
                             <Clock className="h-4 w-4 animate-spin" />
                           ) : testResults[webhook.id] === "success" ? (
-                            <Check className="h-4 w-4 text-green-500" />
+                            <Check className="h-4 w-4 text-success-500 dark:text-success-400" />
                           ) : (
                             <Send className="h-4 w-4" />
                           )}
                         </button>
                         <button
                           onClick={() => deleteWebhook(webhook.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-error-600 dark:text-error-400 hover:text-error-900 dark:hover:text-error-300 transition-colors duration-200"
                           title="Delete webhook"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -309,11 +315,12 @@ const WebhooksManager: React.FC = () => {
 
       <div className="mt-4 px-2">
         <div className="flex items-start">
-          <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
-          <p className="text-sm text-gray-500">
-            <strong>Note:</strong> Webhook endpoints must respond with a 2xx
-            status code within 10 seconds to be considered successful. Configure
-            proper authentication for your webhook endpoints for security.
+          <AlertTriangle className="h-4 w-4 text-warning-500 dark:text-warning-400 mr-2 mt-0.5" />
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            <strong className="text-gray-700 dark:text-gray-300">Note:</strong>{" "}
+            Webhook endpoints must respond with a 2xx status code within 10
+            seconds to be considered successful. Configure proper authentication
+            for your webhook endpoints for security.
           </p>
         </div>
       </div>

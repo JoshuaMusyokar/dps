@@ -7,13 +7,24 @@ import {
   setSubmitting,
   saveDraft,
   setErrors,
+  setBusinessId,
+  setStepSubmissionStatus,
+  setSubmissionMessage,
+  clearSubmissionMessage,
 } from "../../store/slices/business-registration";
+import { useSubmitBusinessDetailsMutation } from "../../store/apis/public-api";
+import {
+  prepareBusinessDetailsFormData,
+  handleApiErrors,
+} from "../../utils/form";
 import { ProgressStepper } from "../../components/ui/ProgressStepper";
 import { Button } from "../../components/ui/Button";
+// import { Toast } from "../../components/ui/Toast"; // Assuming you have a Toast component
 import { BusinessDetailsStep } from "./BusinessDetailsStep";
 import { OwnerInfoStep } from "./OwnerInfoStep";
 import { BankDetailsStep } from "./BankDetailStep";
 import { ReviewStep } from "./ReviewStep";
+import { Toast } from "../../components/ui/Toast";
 
 // Steps for the onboarding process
 const STEPS = [
@@ -27,15 +38,28 @@ export default function BusinessRegistration() {
   const isMobile = useMediaQuery("(max-width: 640px)");
   const dispatch = useAppDispatch();
 
+  // RTK Query mutation
+  const [
+    submitBusinessDetails,
+    {
+      isLoading: isSubmittingBusinessDetails,
+      error: businessDetailsError,
+      isSuccess: businessDetailsSuccess,
+    },
+  ] = useSubmitBusinessDetailsMutation();
+
   const {
     currentStep,
     formErrors,
     isSubmitting,
     businessName,
     address,
+    city,
+    postalCode,
     businessType,
     licenseType,
     otherLicenseType,
+    industry,
     documents,
     ownerFirstName,
     ownerLastName,
@@ -48,7 +72,28 @@ export default function BusinessRegistration() {
     accountNumber,
     branchCode,
     statementDocument,
+    businessId,
+    stepSubmissionStatus,
+    submissionMessage,
   } = useAppSelector((state) => state.registration);
+
+  // Handle API success/error states
+  useEffect(() => {
+    if (businessDetailsSuccess) {
+      dispatch(setStepSubmissionStatus({ step: "step1", status: "success" }));
+      dispatch(
+        setSubmissionMessage("Business details submitted successfully!")
+      );
+    }
+  }, [businessDetailsSuccess, dispatch]);
+
+  useEffect(() => {
+    if (businessDetailsError) {
+      dispatch(setStepSubmissionStatus({ step: "step1", status: "error" }));
+      const errors = handleApiErrors(businessDetailsError);
+      dispatch(setErrors(errors));
+    }
+  }, [businessDetailsError, dispatch]);
 
   // Validate current step
   const validateCurrentStep = (): boolean => {
@@ -56,41 +101,58 @@ export default function BusinessRegistration() {
 
     // Step 1 validation
     if (currentStep === 1) {
-      if (!businessName) newErrors.businessName = "Business name is required";
-      if (!address) newErrors.address = "Address is required";
+      if (!businessName.trim())
+        newErrors.businessName = "Business name is required";
+      if (!address.trim()) newErrors.address = "Address is required";
+      if (!city.trim()) newErrors.city = "City is required";
+      if (!postalCode.trim()) newErrors.postalCode = "Postal code is required";
       if (!businessType) newErrors.businessType = "Business type is required";
       if (!licenseType) newErrors.licenseType = "License type is required";
-      if (licenseType === "other" && !otherLicenseType) {
+      if (!industry.trim()) newErrors.industry = "Industry/sector is required";
+
+      if (licenseType === "other" && !otherLicenseType?.trim()) {
         newErrors.otherLicenseType = "Please specify license type";
       }
 
-      // Required documents
+      // Required documents validation
       const requiredDocs = [
-        "kra_pin",
-        "business_license",
-        "business_registration",
+        { id: "kra_pin", name: "KRA PIN Certificate" },
+        { id: "business_license", name: "Business License" },
+        {
+          id: "business_registration",
+          name: "Business Registration Certificate",
+        },
       ];
-      requiredDocs.forEach((docId) => {
-        if (!documents.some((doc) => doc.id === docId)) {
-          newErrors[docId] = `This document is required`;
+
+      requiredDocs.forEach(({ id, name }) => {
+        if (!documents.some((doc) => doc.id === id && doc.file)) {
+          newErrors[id] = `${name} is required`;
         }
       });
     }
 
     // Step 2 validation
     else if (currentStep === 2) {
-      if (!ownerFirstName) newErrors.ownerFirstName = "First name is required";
-      if (!ownerLastName) newErrors.ownerLastName = "Last name is required";
-      if (!ownerIdNumber)
+      if (!ownerFirstName.trim())
+        newErrors.ownerFirstName = "First name is required";
+      if (!ownerLastName.trim())
+        newErrors.ownerLastName = "Last name is required";
+      if (!ownerIdNumber.trim())
         newErrors.ownerIdNumber = "ID/Passport number is required";
-      if (!ownerEmail) newErrors.ownerEmail = "Email is required";
-      if (!ownerPhone) newErrors.ownerPhone = "Phone number is required";
-      if (!ownerAddress) newErrors.ownerAddress = "Address is required";
+      if (!ownerEmail.trim()) newErrors.ownerEmail = "Email is required";
+      if (!ownerPhone.trim()) newErrors.ownerPhone = "Phone number is required";
+      if (!ownerAddress.trim()) newErrors.ownerAddress = "Address is required";
+
+      // Email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (ownerEmail && !emailRegex.test(ownerEmail)) {
+        newErrors.ownerEmail = "Please enter a valid email address";
+      }
 
       // Required documents
       const requiredDocs = ["id_document", "address_proof", "passport_photo"];
       requiredDocs.forEach((docId) => {
-        if (!ownerDocuments.some((doc) => doc.id === docId)) {
+        if (!ownerDocuments.some((doc) => doc.id === docId && doc.file)) {
           newErrors[docId] = `This document is required`;
         }
       });
@@ -98,11 +160,11 @@ export default function BusinessRegistration() {
 
     // Step 3 validation
     else if (currentStep === 3) {
-      if (!bankName) newErrors.bankName = "Bank name is required";
-      if (!accountNumber)
+      if (!bankName.trim()) newErrors.bankName = "Bank name is required";
+      if (!accountNumber.trim())
         newErrors.accountNumber = "Account number is required";
-      if (!branchCode) newErrors.branchCode = "Branch code is required";
-      if (!statementDocument)
+      if (!branchCode.trim()) newErrors.branchCode = "Branch code is required";
+      if (!statementDocument?.file)
         newErrors.bank_statement = "Bank statement is required";
     }
 
@@ -112,35 +174,95 @@ export default function BusinessRegistration() {
       return false;
     }
 
+    // Clear any existing errors
+    dispatch(setErrors({}));
     return true;
   };
 
-  // Submit final form
-  const submitForm = () => {
-    dispatch(setSubmitting(true));
+  // Submit business details (Step 1)
+  const submitStep1 = async () => {
+    try {
+      dispatch(setSubmitting(true));
+      dispatch(setStepSubmissionStatus({ step: "step1", status: "pending" }));
+      dispatch(clearSubmissionMessage());
 
-    // Simulating API call
-    setTimeout(() => {
+      const formData = prepareBusinessDetailsFormData({
+        businessName,
+        tradingName: "",
+        address,
+        city,
+        postalCode,
+        country: "Kenya",
+        businessType,
+        taxId: "",
+        licenseType,
+        otherLicenseType,
+        documents,
+        industry,
+        yearEstablished: "",
+        employeeCount: "",
+        ownerFirstName,
+        ownerLastName,
+        ownerIdNumber,
+        ownerEmail,
+        ownerPhone,
+        ownerAddress,
+        ownerDocuments,
+        bankName,
+        accountNumber,
+        branchCode,
+        swiftCode: "",
+        statementDocument,
+        currentStep,
+        formErrors,
+        isSubmitting,
+        draftSaved: false,
+      });
+
+      const response = await submitBusinessDetails(formData).unwrap();
+
+      // if (response.status_description && response.data?.id) {
+      //   dispatch(setBusinessId(response.data.id));
+      //   dispatch(setCurrentStep(2)); // Move to next step
+      //   dispatch(
+      //     setSubmissionMessage(
+      //       response.message || "Business details submitted successfully!"
+      //     )
+      //   );
+      // }
+    } catch (error) {
+      console.error("Error submitting business details:", error);
+      // Error handling is done in useEffect above
+    } finally {
       dispatch(setSubmitting(false));
-      // In a real application, you would handle the response here
-      alert("Form submitted successfully!");
-    }, 2000);
+    }
   };
 
   // Handle navigation
-  const goToNextStep = () => {
-    if (validateCurrentStep()) {
-      if (currentStep < STEPS.length) {
-        dispatch(setCurrentStep(currentStep + 1));
-      } else if (currentStep === STEPS.length) {
-        submitForm();
-      }
+  const goToNextStep = async () => {
+    if (!validateCurrentStep()) {
+      return;
+    }
+
+    // Handle step-specific submissions
+    if (currentStep === 1) {
+      await submitStep1();
+    } else if (currentStep === 2) {
+      // Handle owner info submission (implement later)
+      dispatch(setCurrentStep(currentStep + 1));
+    } else if (currentStep === 3) {
+      // Handle bank details submission (implement later)
+      dispatch(setCurrentStep(currentStep + 1));
+    } else if (currentStep === STEPS.length) {
+      // Final submission (implement later)
+      console.log("Final submission");
     }
   };
 
   const goToPreviousStep = () => {
     if (currentStep > 1) {
       dispatch(setCurrentStep(currentStep - 1));
+      dispatch(clearSubmissionMessage());
     }
   };
 
@@ -150,7 +272,7 @@ export default function BusinessRegistration() {
     setTimeout(() => {
       dispatch(setSubmitting(false));
       dispatch(saveDraft());
-      alert("Draft saved successfully!");
+      dispatch(setSubmissionMessage("Draft saved successfully!"));
     }, 1000);
   };
 
@@ -178,598 +300,268 @@ export default function BusinessRegistration() {
     return "Continue →";
   };
 
+  // Check if step can proceed
+  const canProceed = () => {
+    if (currentStep === 1) {
+      return stepSubmissionStatus.step1 === "success" || !businessId;
+    }
+    return true;
+  };
+
   return (
-    <div className="w-full p-4 md:p-6 bg-white rounded-lg shadow-sm">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Merchant Onboarding
-        </h1>
-        <h2 className="text-xl font-semibold text-gray-700 mt-2">
-          Business Registration
-        </h2>
-      </div>
-
-      {/* Progress Stepper */}
-      <div className="mb-8">
-        <ProgressStepper
-          steps={STEPS}
-          activeStep={currentStep}
-          compact={isMobile}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-primary-50/30 dark:from-gray-950 dark:via-gray-900 dark:to-dark-primary-950/30 transition-colors duration-300">
+      {/* Toast Notification */}
+      {submissionMessage && (
+        <Toast
+          message={submissionMessage}
+          type={stepSubmissionStatus.step1 === "error" ? "error" : "success"}
+          onClose={() => dispatch(clearSubmissionMessage())}
         />
-      </div>
+      )}
 
-      {/* Form content */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          goToNextStep();
-        }}
-      >
-        {renderStep()}
+      {/* Main Container with Glassmorphism */}
+      <div className="w-full max-w-4xl mx-auto p-4 md:p-6">
+        <div className="glass dark:glass-dark rounded-3xl shadow-soft-lg dark:shadow-glass-dark backdrop-blur-xl border border-white/20 dark:border-white/10 overflow-hidden">
+          {/* Header with Gradient Background */}
+          <div className="relative bg-gradient-to-r from-primary-600 via-primary-500 to-accent-500 dark:from-dark-primary-900 dark:via-dark-primary-800 dark:to-accent-800 p-6 md:p-8">
+            {/* Decorative Background Pattern */}
+            <div className="absolute inset-0 bg-mesh-gradient opacity-10"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/5 to-white/10 dark:from-transparent dark:via-black/5 dark:to-black/10"></div>
 
-        {/* Navigation Buttons */}
-        <div className="flex flex-wrap justify-between pt-4 border-t border-gray-200 gap-2">
-          <Button
-            variant="outline"
-            onClick={goToPreviousStep}
-            disabled={currentStep === 1}
-          >
-            ← Back
-          </Button>
+            {/* Header Content */}
+            <div className="relative z-10">
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 animate-fade-in-down">
+                Merchant Onboarding
+              </h1>
+              <h2 className="text-xl md:text-2xl font-semibold text-white/90 animate-fade-in-down animation-delay-100">
+                Business Registration
+              </h2>
 
-          <Button
-            variant="secondary"
-            onClick={handleSaveDraft}
-            loading={isSubmitting}
-          >
-            Save Draft
-          </Button>
+              {/* Show business ID if available */}
+              {businessId && (
+                <div className="mt-3 px-3 py-1 bg-green-500/20 rounded-lg">
+                  <p className="text-sm text-white/90">
+                    Registration ID:{" "}
+                    <span className="font-mono">{businessId}</span>
+                  </p>
+                </div>
+              )}
 
-          <Button type="submit" variant="primary" loading={isSubmitting}>
-            {getButtonText()}
-          </Button>
+              {/* Decorative Elements */}
+              <div className="absolute top-4 right-4 w-20 h-20 bg-white/10 dark:bg-black/10 rounded-full blur-xl animate-pulse-glow"></div>
+              <div className="absolute bottom-2 right-8 w-12 h-12 bg-accent-300/20 dark:bg-accent-700/20 rounded-full blur-lg animate-float"></div>
+            </div>
+          </div>
+
+          {/* Progress Stepper Container */}
+          <div className="bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/30 p-4 md:p-6">
+            <ProgressStepper
+              steps={STEPS.map((step, index) => ({
+                ...step,
+                status:
+                  index + 1 < currentStep
+                    ? "completed"
+                    : index + 1 === currentStep
+                    ? "current"
+                    : "upcoming",
+              }))}
+              activeStep={currentStep}
+              compact={isMobile}
+            />
+          </div>
+
+          {/* Form Content */}
+          <div className="p-6 md:p-8 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                goToNextStep();
+              }}
+              className="space-y-6"
+            >
+              {/* Step Content with Animation */}
+              <div className="animate-fade-in-up transition-all duration-500 ease-smooth">
+                {renderStep()}
+              </div>
+
+              {/* Error Display */}
+              {formErrors.general && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <svg
+                      className="w-5 h-5 text-red-600 dark:text-red-400 mr-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <p className="text-red-700 dark:text-red-300 text-sm font-medium">
+                      {formErrors.general}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading Indicator for API Calls */}
+              {isSubmittingBusinessDetails && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+                    <p className="text-blue-700 dark:text-blue-300 text-sm font-medium">
+                      Submitting business details...
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation Buttons */}
+              <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-gray-200/60 dark:border-gray-700/40 gap-4 sm:gap-2">
+                {/* Back Button */}
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={goToPreviousStep}
+                  disabled={currentStep === 1 || isSubmittingBusinessDetails}
+                  className="w-full sm:w-auto order-2 sm:order-1 
+                    bg-white/80 dark:bg-gray-800/80 
+                    border-gray-300 dark:border-gray-600 
+                    text-gray-700 dark:text-gray-300 
+                    hover:bg-gray-50 dark:hover:bg-gray-700
+                    hover:border-gray-400 dark:hover:border-gray-500
+                    hover:text-gray-900 dark:hover:text-gray-100
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    disabled:hover:bg-white/80 dark:disabled:hover:bg-gray-800/80
+                    transition-all duration-300 ease-smooth
+                    shadow-soft hover:shadow-soft-lg
+                    backdrop-blur-sm"
+                >
+                  ← Back
+                </Button>
+
+                {/* Save Draft Button */}
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={handleSaveDraft}
+                  disabled={isSubmitting || isSubmittingBusinessDetails}
+                  loading={isSubmitting && !isSubmittingBusinessDetails}
+                  className="w-full sm:w-auto order-3 sm:order-2
+                    bg-gray-100/80 dark:bg-gray-700/80
+                    border-gray-200 dark:border-gray-600
+                    text-gray-700 dark:text-gray-300
+                    hover:bg-gray-200 dark:hover:bg-gray-600
+                    hover:border-gray-300 dark:hover:border-gray-500
+                    hover:text-gray-900 dark:hover:text-gray-100
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    transition-all duration-300 ease-smooth
+                    shadow-soft hover:shadow-soft-lg
+                    backdrop-blur-sm"
+                >
+                  Save Draft
+                </Button>
+
+                {/* Continue/Submit Button */}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={
+                    isSubmittingBusinessDetails ||
+                    (currentStep === 1 &&
+                      stepSubmissionStatus.step1 === "success" &&
+                      !canProceed())
+                  }
+                  loading={isSubmittingBusinessDetails}
+                  className="w-full sm:w-auto order-1 sm:order-3
+                    bg-gradient-to-r from-primary-600 to-accent-600 
+                    dark:from-dark-primary-800 dark:to-accent-700
+                    border-none text-white font-semibold
+                    hover:from-primary-700 hover:to-accent-700
+                    dark:hover:from-dark-primary-900 dark:hover:to-accent-800
+                    disabled:opacity-70 disabled:cursor-not-allowed
+                    transition-all duration-300 ease-smooth
+                    shadow-glow hover:shadow-glow-lg
+                    transform hover:scale-105 active:scale-95
+                    backdrop-blur-sm"
+                >
+                  {currentStep === 1 && stepSubmissionStatus.step1 === "success"
+                    ? "Continue to Owner Info →"
+                    : getButtonText()}
+                </Button>
+              </div>
+
+              {/* Step Status Indicators */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-4">
+                {STEPS.map((step, index) => {
+                  const stepNumber = index + 1;
+                  const isCompleted = stepNumber < currentStep;
+                  const isCurrent = stepNumber === currentStep;
+                  let status = "idle";
+
+                  if (stepNumber === 1) status = stepSubmissionStatus.step1;
+                  else if (stepNumber === 2)
+                    status = stepSubmissionStatus.step2;
+                  else if (stepNumber === 3)
+                    status = stepSubmissionStatus.step3;
+                  else if (stepNumber === 4)
+                    status = stepSubmissionStatus.final;
+
+                  return (
+                    <div
+                      key={step.id}
+                      className="flex items-center justify-center"
+                    >
+                      <div
+                        className={`
+                        px-3 py-1 rounded-full text-xs font-medium transition-all duration-300
+                        ${
+                          isCompleted
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                            : isCurrent && status === "success"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                            : isCurrent && status === "error"
+                            ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                            : isCurrent && status === "pending"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                            : isCurrent
+                            ? "bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-300"
+                            : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                        }
+                      `}
+                      >
+                        {isCompleted || (isCurrent && status === "success")
+                          ? "✓ "
+                          : ""}
+                        {step.label}
+                        {isCurrent && status === "pending" && " ⏳"}
+                        {isCurrent && status === "error" && " ✗"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </form>
+          </div>
+
+          {/* Footer Decoration */}
+          <div className="h-2 bg-gradient-to-r from-primary-500 via-accent-500 to-primary-600 dark:from-dark-primary-800 dark:via-accent-700 dark:to-dark-primary-900"></div>
         </div>
-      </form>
+
+        {/* Background Decorative Elements */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+          <div className="absolute top-1/4 -left-20 w-80 h-80 bg-primary-200/20 dark:bg-dark-primary-800/10 rounded-full blur-3xl animate-float"></div>
+          <div
+            className="absolute bottom-1/4 -right-20 w-96 h-96 bg-accent-200/20 dark:bg-accent-800/10 rounded-full blur-3xl animate-float"
+            style={{ animationDelay: "2s" }}
+          ></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary-100/10 via-transparent to-transparent dark:from-dark-primary-900/5 blur-3xl"></div>
+        </div>
+      </div>
     </div>
   );
 }
-// import { useState, useRef, ChangeEvent, FormEvent } from "react";
-// import { useMediaQuery } from "../../hooks/useMediaQuery";
-// import { ProgressStepper } from "../../components/ui/ProgressStepper";
-// import { FileUploader } from "../../components/ui/FileUpload";
-// import { RadioGroup } from "../../components/ui/RadioGroup";
-// import { TextField } from "../../components/ui/TextField";
-// import { InfoBox } from "../../components/ui/InfoBox";
-// import { Button } from "../../components/ui/Button";
-
-// // Types
-// export type BusinessType =
-//   | "sole_proprietorship"
-//   | "partnership"
-//   | "limited_company"
-//   | "corporation"
-//   | "ngo"
-//   | "other";
-
-// export type LicenseType =
-//   | "single_business"
-//   | "county_trade"
-//   | "national"
-//   | "other";
-
-// export type DocumentFile = {
-//   id: string;
-//   file: File;
-//   type: string;
-//   uploaded: boolean;
-//   validated: boolean;
-// };
-
-// export type BusinessRegistrationData = {
-//   businessName: string;
-//   tradingName: string;
-//   address: string;
-//   city: string;
-//   postalCode: string;
-//   country: string;
-//   businessType: BusinessType | "";
-//   taxId: string;
-//   licenseType: LicenseType | "";
-//   otherLicenseType: string;
-//   documents: DocumentFile[];
-//   industry: string;
-//   yearEstablished: string;
-//   employeeCount: string;
-// };
-
-// // Steps for the onboarding process
-// const STEPS = [
-//   { id: 1, label: "Business Details" },
-//   { id: 2, label: "Owner Info" },
-//   { id: 3, label: "Bank Details" },
-//   { id: 4, label: "Review" },
-// ];
-
-// // File size limit in bytes (5MB)
-// const FILE_SIZE_LIMIT = 5 * 1024 * 1024;
-// const ALLOWED_FILE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
-
-// export default function BusinessRegistration() {
-//   const isMobile = useMediaQuery("(max-width: 640px)");
-
-//   // Form state
-//   const [formData, setFormData] = useState<BusinessRegistrationData>({
-//     businessName: "",
-//     tradingName: "",
-//     address: "",
-//     city: "",
-//     postalCode: "",
-//     country: "Kenya", // Default country
-//     businessType: "",
-//     taxId: "",
-//     licenseType: "",
-//     otherLicenseType: "",
-//     documents: [],
-//     industry: "",
-//     yearEstablished: "",
-//     employeeCount: "",
-//   });
-
-//   // UI state
-//   const [activeStep, setActiveStep] = useState<number>(1);
-//   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-//   const [isSaving, setIsSaving] = useState<boolean>(false);
-//   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
-//     {}
-//   );
-
-//   // Business types
-//   const businessTypes = [
-//     { value: "sole_proprietorship", label: "Sole Proprietorship" },
-//     { value: "partnership", label: "Partnership" },
-//     { value: "limited_company", label: "Limited Company" },
-//     { value: "corporation", label: "Corporation" },
-//     { value: "ngo", label: "NGO/Non-Profit" },
-//     { value: "other", label: "Other" },
-//   ];
-
-//   // License types
-//   const licenseTypes = [
-//     { value: "single_business", label: "Single Business Permit" },
-//     { value: "county_trade", label: "County Trade License" },
-//     { value: "national", label: "National Business License" },
-//     { value: "other", label: "Other" },
-//   ];
-
-//   const requiredDocuments = [
-//     { id: "kra_pin", label: "KRA PIN Certificate", required: true },
-//     {
-//       id: "business_license",
-//       label: "Business License/Permit",
-//       required: true,
-//     },
-//     {
-//       id: "business_registration",
-//       label: "Business Registration Certificate",
-//       required: true,
-//     },
-//   ];
-
-//   // Handle form field changes
-//   const handleInputChange = (name: string, value: string) => {
-//     setFormData((prev) => ({ ...prev, [name]: value }));
-
-//     // Clear error for this field if it exists
-//     if (formErrors[name]) {
-//       setFormErrors((prev) => {
-//         const newErrors = { ...prev };
-//         delete newErrors[name];
-//         return newErrors;
-//       });
-//     }
-//   };
-
-//   // Handle file upload
-//   const handleFileUpload = (documentId: string, file: File) => {
-//     // Validate file type and size
-//     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-//       setFormErrors((prev) => ({
-//         ...prev,
-//         [documentId]: "Invalid file type. Please upload PDF, JPG, or PNG.",
-//       }));
-//       return;
-//     }
-
-//     if (file.size > FILE_SIZE_LIMIT) {
-//       setFormErrors((prev) => ({
-//         ...prev,
-//         [documentId]: "File size exceeds 5MB limit.",
-//       }));
-//       return;
-//     }
-
-//     // Clear error if exists
-//     if (formErrors[documentId]) {
-//       setFormErrors((prev) => {
-//         const newErrors = { ...prev };
-//         delete newErrors[documentId];
-//         return newErrors;
-//       });
-//     }
-
-//     // Simulate upload progress
-//     setUploadProgress((prev) => ({ ...prev, [documentId]: 0 }));
-
-//     // Simulate upload
-//     const interval = setInterval(() => {
-//       setUploadProgress((prev) => {
-//         const current = prev[documentId] || 0;
-//         const newProgress = Math.min(current + 10, 100);
-
-//         if (newProgress === 100) {
-//           clearInterval(interval);
-
-//           // Add document to state after "upload" completes
-//           setFormData((prev) => ({
-//             ...prev,
-//             documents: [
-//               ...prev.documents.filter((doc) => doc.id !== documentId),
-//               {
-//                 id: documentId,
-//                 file,
-//                 type: file.type,
-//                 uploaded: true,
-//                 validated: false,
-//               },
-//             ],
-//           }));
-//         }
-
-//         return { ...prev, [documentId]: newProgress };
-//       });
-//     }, 200);
-//   };
-
-//   // Remove document
-//   const removeDocument = (documentId: string) => {
-//     setFormData((prev) => ({
-//       ...prev,
-//       documents: prev.documents.filter((doc) => doc.id !== documentId),
-//     }));
-
-//     // Clear any errors for this document
-//     if (formErrors[documentId]) {
-//       setFormErrors((prev) => {
-//         const newErrors = { ...prev };
-//         delete newErrors[documentId];
-//         return newErrors;
-//       });
-//     }
-
-//     // Clear upload progress
-//     setUploadProgress((prev) => {
-//       const newProgress = { ...prev };
-//       delete newProgress[documentId];
-//       return newProgress;
-//     });
-//   };
-
-//   // Handle form submission
-//   const handleSubmit = (e: FormEvent) => {
-//     e.preventDefault();
-
-//     // Validate fields
-//     const newErrors: Record<string, string> = {};
-
-//     // Required fields
-//     if (!formData.businessName)
-//       newErrors.businessName = "Business name is required";
-//     if (!formData.address) newErrors.address = "Address is required";
-//     if (!formData.businessType)
-//       newErrors.businessType = "Business type is required";
-//     if (!formData.licenseType)
-//       newErrors.licenseType = "License type is required";
-//     if (formData.licenseType === "other" && !formData.otherLicenseType) {
-//       newErrors.otherLicenseType = "Please specify license type";
-//     }
-
-//     // Required documents
-//     requiredDocuments.forEach((doc) => {
-//       if (!formData.documents.some((d) => d.id === doc.id)) {
-//         newErrors[doc.id] = `${doc.label} is required`;
-//       }
-//     });
-
-//     // If there are errors, display them and stop
-//     if (Object.keys(newErrors).length > 0) {
-//       setFormErrors(newErrors);
-//       return;
-//     }
-
-//     // Set saving state
-//     setIsSaving(true);
-
-//     // Simulating API call
-//     setTimeout(() => {
-//       setIsSaving(false);
-//       setActiveStep(2); // Move to next step
-//       // Would typically send formData to backend API here
-//     }, 1500);
-//   };
-
-//   // Handle navigation
-//   const goBack = () => {
-//     if (activeStep > 1) {
-//       setActiveStep(activeStep - 1);
-//     }
-//   };
-
-//   const saveAsDraft = () => {
-//     // Implement draft saving logic
-//     setIsSaving(true);
-//     setTimeout(() => setIsSaving(false), 1000);
-//     // Would typically save to local storage or backend
-//   };
-
-//   // Find a document by ID
-//   const findDocument = (id: string) => {
-//     return formData.documents.find((doc) => doc.id === id);
-//   };
-
-//   return (
-//     <div className="w-full max-w-5xl mx-auto p-4 md:p-6 bg-white rounded-lg shadow-sm">
-//       <form onSubmit={handleSubmit}>
-//         {/* Header */}
-//         <div className="mb-6">
-//           <h1 className="text-2xl font-bold text-gray-800">
-//             Merchant Onboarding
-//           </h1>
-//           <h2 className="text-xl font-semibold text-gray-700 mt-2">
-//             Business Registration
-//           </h2>
-//         </div>
-
-//         {/* Progress Stepper */}
-//         <div className="mb-8">
-//           <ProgressStepper
-//             steps={STEPS}
-//             activeStep={activeStep}
-//             compact={isMobile}
-//           />
-//         </div>
-
-//         {/* Upload Documents Section */}
-//         <section className="mb-8">
-//           <h3 className="text-lg font-medium text-gray-800 mb-4">
-//             Upload Required Documents
-//           </h3>
-//           <p className="text-sm text-gray-500 mb-4">
-//             (All fields marked * are mandatory)
-//           </p>
-
-//           <div className="space-y-6">
-//             {/* KRA PIN Certificate */}
-//             <div>
-//               <FileUploader
-//                 id="kra_pin"
-//                 label="KRA PIN Certificate*"
-//                 description="Must be a valid KRA PIN registered under the business name"
-//                 acceptedFormats="PDF, JPG, PNG (Max 5MB)"
-//                 onFileSelect={(file) => handleFileUpload("kra_pin", file)}
-//                 onRemove={() => removeDocument("kra_pin")}
-//                 error={formErrors.kra_pin}
-//                 file={findDocument("kra_pin")?.file}
-//                 progress={uploadProgress.kra_pin}
-//               />
-//             </div>
-
-//             {/* Business License */}
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 mb-1">
-//                 Business License/Permit*
-//               </label>
-
-//               <RadioGroup
-//                 name="licenseType"
-//                 options={licenseTypes}
-//                 value={formData.licenseType}
-//                 onChange={(value) => handleInputChange("licenseType", value)}
-//                 error={formErrors.licenseType}
-//               />
-
-//               {formData.licenseType === "other" && (
-//                 <TextField
-//                   name="otherLicenseType"
-//                   placeholder="Please specify"
-//                   value={formData.otherLicenseType}
-//                   onChange={(e) =>
-//                     handleInputChange("otherLicenseType", e.target.value)
-//                   }
-//                   error={formErrors.otherLicenseType}
-//                   className="mt-2 w-full max-w-xs"
-//                 />
-//               )}
-
-//               <div className="mt-2">
-//                 <FileUploader
-//                   id="business_license"
-//                   description="Upload your business license or permit"
-//                   acceptedFormats="PDF, JPG, PNG (Max 5MB)"
-//                   onFileSelect={(file) =>
-//                     handleFileUpload("business_license", file)
-//                   }
-//                   onRemove={() => removeDocument("business_license")}
-//                   error={formErrors.business_license}
-//                   file={findDocument("business_license")?.file}
-//                   progress={uploadProgress.business_license}
-//                 />
-//               </div>
-//             </div>
-
-//             {/* Business Registration Certificate */}
-//             <div>
-//               <FileUploader
-//                 id="business_registration"
-//                 label="Business Registration Certificate*"
-//                 description="Certificate of registration/incorporation"
-//                 acceptedFormats="PDF, JPG, PNG (Max 5MB)"
-//                 onFileSelect={(file) =>
-//                   handleFileUpload("business_registration", file)
-//                 }
-//                 onRemove={() => removeDocument("business_registration")}
-//                 error={formErrors.business_registration}
-//                 file={findDocument("business_registration")?.file}
-//                 progress={uploadProgress.business_registration}
-//               />
-//             </div>
-
-//             {/* Additional Documents */}
-//             <div>
-//               <FileUploader
-//                 id="additional_doc"
-//                 label="Additional Documents (Optional)"
-//                 description="Any other relevant business documents"
-//                 acceptedFormats="PDF, JPG, PNG (Max 5MB)"
-//                 onFileSelect={(file) =>
-//                   handleFileUpload(`additional_${Date.now()}`, file)
-//                 }
-//                 multiple
-//                 additionalFiles={formData.documents
-//                   .filter((doc) => doc.id.startsWith("additional_"))
-//                   .map((doc) => ({
-//                     id: doc.id,
-//                     file: doc.file,
-//                     onRemove: () => removeDocument(doc.id),
-//                   }))}
-//               />
-//             </div>
-//           </div>
-//         </section>
-
-//         {/* Business Details Section */}
-//         <section className="mb-8">
-//           <h3 className="text-lg font-medium text-gray-800 mb-4">
-//             Business Details
-//           </h3>
-
-//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-//             <TextField
-//               label="Registered Business Name*"
-//               name="businessName"
-//               value={formData.businessName}
-//               onChange={(e) =>
-//                 handleInputChange("businessName", e.target.value)
-//               }
-//               placeholder="As per KRA"
-//               error={formErrors.businessName}
-//             />
-
-//             <TextField
-//               label="Trading Name (if different)"
-//               name="tradingName"
-//               value={formData.tradingName}
-//               onChange={(e) => handleInputChange("tradingName", e.target.value)}
-//             />
-
-//             <TextField
-//               label="Physical Address*"
-//               name="address"
-//               value={formData.address}
-//               onChange={(e) => handleInputChange("address", e.target.value)}
-//               error={formErrors.address}
-//             />
-
-//             <div className="grid grid-cols-2 gap-3">
-//               <TextField
-//                 label="City*"
-//                 name="city"
-//                 value={formData.city}
-//                 onChange={(e) => handleInputChange("city", e.target.value)}
-//                 error={formErrors.city}
-//               />
-
-//               <TextField
-//                 label="Postal Code*"
-//                 name="postalCode"
-//                 value={formData.postalCode}
-//                 onChange={(e) =>
-//                   handleInputChange("postalCode", e.target.value)
-//                 }
-//                 error={formErrors.postalCode}
-//               />
-//             </div>
-
-//             <div>
-//               <label className="block text-sm font-medium text-gray-700 mb-2">
-//                 Business Type*
-//               </label>
-//               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-//                 {businessTypes.map((option) => (
-//                   <label key={option.value} className="flex items-center">
-//                     <input
-//                       type="radio"
-//                       name="businessType"
-//                       checked={formData.businessType === option.value}
-//                       onChange={() =>
-//                         handleInputChange("businessType", option.value)
-//                       }
-//                       className="h-4 w-4 text-blue-600"
-//                     />
-//                     <span className="ml-2 text-sm text-gray-700">
-//                       {option.label}
-//                     </span>
-//                   </label>
-//                 ))}
-//               </div>
-//               {formErrors.businessType && (
-//                 <p className="mt-1 text-xs text-red-500">
-//                   {formErrors.businessType}
-//                 </p>
-//               )}
-//             </div>
-
-//             <TextField
-//               label="Industry/Sector*"
-//               name="industry"
-//               value={formData.industry}
-//               onChange={(e) => handleInputChange("industry", e.target.value)}
-//               error={formErrors.industry}
-//             />
-//           </div>
-//         </section>
-
-//         {/* Next Steps Info */}
-//         <InfoBox
-//           title="Next Steps"
-//           items={[
-//             "Documents will be verified within 2 business days.",
-//             "You'll receive an email/SMS once approved.",
-//             "After approval, you'll complete owner and bank details.",
-//           ]}
-//           variant="info"
-//           className="mb-8"
-//         />
-
-//         {/* Navigation Buttons */}
-//         <div className="flex flex-wrap justify-between pt-4 border-t border-gray-200 gap-2">
-//           <Button
-//             variant="outline"
-//             onClick={goBack}
-//             disabled={activeStep === 1}
-//           >
-//             ← Back
-//           </Button>
-
-//           <Button variant="secondary" onClick={saveAsDraft} loading={isSaving}>
-//             Save Draft
-//           </Button>
-
-//           <Button type="submit" variant="primary" loading={isSaving}>
-//             Continue →
-//           </Button>
-//         </div>
-//       </form>
-//     </div>
-//   );
-// }

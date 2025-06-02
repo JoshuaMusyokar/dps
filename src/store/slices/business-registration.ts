@@ -7,7 +7,19 @@ import {
   DocumentFile,
 } from "../../types";
 
-const initialState: BusinessRegistrationData = {
+interface RegistrationState extends BusinessRegistrationData {
+  // Add API-related state
+  businessId?: string;
+  stepSubmissionStatus: {
+    step1: "idle" | "pending" | "success" | "error";
+    step2: "idle" | "pending" | "success" | "error";
+    step3: "idle" | "pending" | "success" | "error";
+    final: "idle" | "pending" | "success" | "error";
+  };
+  submissionMessage?: string;
+}
+
+const initialState: RegistrationState = {
   // Step 1: Business Details
   businessName: "",
   tradingName: "",
@@ -45,6 +57,16 @@ const initialState: BusinessRegistrationData = {
   formErrors: {},
   isSubmitting: false,
   draftSaved: false,
+
+  // API state
+  businessId: undefined,
+  stepSubmissionStatus: {
+    step1: "idle",
+    step2: "idle",
+    step3: "idle",
+    final: "idle",
+  },
+  submissionMessage: undefined,
 };
 
 export const registrationSlice = createSlice({
@@ -107,6 +129,30 @@ export const registrationSlice = createSlice({
       state.draftSaved = true;
     },
 
+    // New actions for API handling
+    setBusinessId: (state, action: PayloadAction<string>) => {
+      state.businessId = action.payload;
+    },
+
+    setStepSubmissionStatus: (
+      state,
+      action: PayloadAction<{
+        step: keyof RegistrationState["stepSubmissionStatus"];
+        status: RegistrationState["stepSubmissionStatus"][keyof RegistrationState["stepSubmissionStatus"]];
+      }>
+    ) => {
+      const { step, status } = action.payload;
+      state.stepSubmissionStatus[step] = status;
+    },
+
+    setSubmissionMessage: (state, action: PayloadAction<string>) => {
+      state.submissionMessage = action.payload;
+    },
+
+    clearSubmissionMessage: (state) => {
+      state.submissionMessage = undefined;
+    },
+
     resetForm: () => initialState,
   },
 });
@@ -123,6 +169,10 @@ export const {
   setCurrentStep,
   setSubmitting,
   saveDraft,
+  setBusinessId,
+  setStepSubmissionStatus,
+  setSubmissionMessage,
+  clearSubmissionMessage,
   resetForm,
 } = registrationSlice.actions;
 

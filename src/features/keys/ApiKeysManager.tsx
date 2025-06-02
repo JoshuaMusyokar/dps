@@ -1,364 +1,320 @@
 import React, { useState, useEffect } from "react";
-import {
-  Eye,
-  EyeOff,
-  Copy,
-  RefreshCcw,
-  Plus,
-  Trash2,
-  Check,
-  AlertTriangle,
-  Shield,
-} from "lucide-react";
-import KeyModal from "./KeyModal";
-import { ApiKey } from "../../types";
+import { Clock, ArrowUpRight, RefreshCw, Search } from "lucide-react";
 
-const ApiKeysManager: React.FC = () => {
-  // State for API keys
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
-  const [copyStatus, setCopyStatus] = useState<Record<string, boolean>>({});
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isTestMode, setIsTestMode] = useState(false);
+interface ApiLog {
+  id: string;
+  method: string;
+  endpoint: string;
+  statusCode: number;
+  timestamp: string;
+  duration: number;
+  ipAddress: string;
+  apiKeyId: string;
+  apiKeyName?: string;
+}
 
-  // Mock data loading - replace with actual API calls
+const LogViewer: React.FC = () => {
+  const [logs, setLogs] = useState<ApiLog[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<"all" | "success" | "error">("all");
+
+  // Simulate fetching logs
   useEffect(() => {
-    // Simulate API key fetch
-    setApiKeys([
-      {
-        id: "1",
-        name: "Production API",
-        key: "pk_live_51HG8qKLsN3cMVxSr9vVyHbQMCsRcTX",
-        type: "public",
-        environment: "live",
-        createdAt: "2025-01-15T10:30:00Z",
-        lastUsed: "2025-04-05T14:22:33Z",
-        expiresAt: "2026-01-15T10:30:00Z",
-      },
-      {
-        id: "2",
-        name: "Backend Server",
-        key: "sk_live_51HG8qKLsN3cMVxSr9vVyHbQMCsRcTX",
-        type: "private",
-        environment: "live",
-        createdAt: "2025-01-15T10:35:00Z",
-        lastUsed: "2025-04-06T09:12:45Z",
-        expiresAt: "2026-01-15T10:35:00Z",
-      },
-      {
-        id: "3",
-        name: "Test API",
-        key: "pk_test_51HG8qKLsN3cMVxSr9vVyHbQMCsRcTX",
-        type: "public",
-        environment: "test",
-        createdAt: "2025-01-16T15:22:00Z",
-        lastUsed: "2025-04-01T11:42:19Z",
-        expiresAt: "2026-01-16T15:22:00Z",
-      },
-    ]);
+    fetchLogs();
   }, []);
 
-  // Initialize visibility and copy status for API keys
-  useEffect(() => {
-    const initialShowKeys: Record<string, boolean> = {};
-    const initialCopyStatus: Record<string, boolean> = {};
+  const fetchLogs = () => {
+    setLoading(true);
+    // Mock API call
+    setTimeout(() => {
+      const mockLogs: ApiLog[] = [
+        {
+          id: "log_1",
+          method: "POST",
+          endpoint: "/v1/payments",
+          statusCode: 200,
+          timestamp: "2025-04-26T08:12:34Z",
+          duration: 230,
+          ipAddress: "192.168.1.1",
+          apiKeyId: "1",
+          apiKeyName: "Production API",
+        },
+        {
+          id: "log_2",
+          method: "GET",
+          endpoint: "/v1/customers/cus_123456",
+          statusCode: 200,
+          timestamp: "2025-04-26T08:10:12Z",
+          duration: 125,
+          ipAddress: "192.168.1.1",
+          apiKeyId: "1",
+          apiKeyName: "Production API",
+        },
+        {
+          id: "log_3",
+          method: "POST",
+          endpoint: "/v1/subscriptions",
+          statusCode: 400,
+          timestamp: "2025-04-26T08:05:43Z",
+          duration: 180,
+          ipAddress: "192.168.1.2",
+          apiKeyId: "2",
+          apiKeyName: "Backend Server",
+        },
+        {
+          id: "log_4",
+          method: "GET",
+          endpoint: "/v1/products",
+          statusCode: 200,
+          timestamp: "2025-04-26T07:58:21Z",
+          duration: 150,
+          ipAddress: "192.168.1.3",
+          apiKeyId: "1",
+          apiKeyName: "Production API",
+        },
+        {
+          id: "log_5",
+          method: "POST",
+          endpoint: "/v1/refunds",
+          statusCode: 500,
+          timestamp: "2025-04-26T07:45:11Z",
+          duration: 320,
+          ipAddress: "192.168.1.2",
+          apiKeyId: "2",
+          apiKeyName: "Backend Server",
+        },
+      ];
 
-    apiKeys.forEach((key) => {
-      initialShowKeys[key.id] = false;
-      initialCopyStatus[key.id] = false;
-    });
-
-    setShowKeys(initialShowKeys);
-    setCopyStatus(initialCopyStatus);
-  }, [apiKeys]);
-
-  // Function to toggle API key visibility
-  const toggleKeyVisibility = (id: string) => {
-    setShowKeys((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+      setLogs(mockLogs);
+      setLoading(false);
+    }, 800);
   };
 
-  // Function to copy API key to clipboard
-  const copyApiKey = (id: string, key: string) => {
-    navigator.clipboard.writeText(key).then(() => {
-      setCopyStatus((prev) => ({ ...prev, [id]: true }));
-      setTimeout(() => {
-        setCopyStatus((prev) => ({ ...prev, [id]: false }));
-      }, 2000);
-    });
-  };
-
-  // Function to delete an API key
-  const deleteApiKey = (id: string) => {
-    // In a real app, make an API call to delete the key
-    setApiKeys((prev) => prev.filter((key) => key.id !== id));
-  };
-
-  // Function to rotate a key (create a new one and mark old for deprecation)
-  const rotateKey = (key: ApiKey) => {
-    // In a real app, make an API call to rotate the key
-    // For demo, we'll just create a new one with "rotated" in the name
-    const mockGeneratedKey =
-      key.type === "public"
-        ? `${
-            key.environment === "live" ? "pk_live_" : "pk_test_"
-          }${Math.random().toString(36).substring(2, 15)}`
-        : `${
-            key.environment === "live" ? "sk_live_" : "sk_test_"
-          }${Math.random().toString(36).substring(2, 15)}`;
-
-    const newKey: ApiKey = {
-      id: Date.now().toString(),
-      name: `${key.name} (Rotated)`,
-      key: mockGeneratedKey,
-      type: key.type,
-      environment: key.environment,
-      createdAt: new Date().toISOString(),
-      lastUsed: null,
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-
-    setApiKeys((prev) => [...prev, newKey]);
-
-    // Set visibility for the new key
-    setShowKeys((prev) => ({ ...prev, [newKey.id]: true }));
-    setCopyStatus((prev) => ({ ...prev, [newKey.id]: false }));
-  };
-
-  // Function to create a new API key
-  const handleCreateKey = (keyData: Partial<ApiKey>) => {
-    const environment = isTestMode ? "test" : "live";
-    const keyPrefix =
-      keyData.type === "public"
-        ? environment === "live"
-          ? "pk_live_"
-          : "pk_test_"
-        : environment === "live"
-        ? "sk_live_"
-        : "sk_test_";
-
-    const mockGeneratedKey = `${keyPrefix}${Math.random()
-      .toString(36)
-      .substring(2, 15)}`;
-
-    const newKey: ApiKey = {
-      id: Date.now().toString(),
-      name: keyData.name || "New Key",
-      key: mockGeneratedKey,
-      type: keyData.type || "public",
-      environment: environment,
-      createdAt: new Date().toISOString(),
-      lastUsed: null,
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-
-    setApiKeys((prev) => [...prev, newKey]);
-    setIsModalOpen(false);
-
-    // Set visibility for the new key
-    setShowKeys((prev) => ({ ...prev, [newKey.id]: true }));
-    setCopyStatus((prev) => ({ ...prev, [newKey.id]: false }));
-  };
-
-  // Function to format ISO date to readable format
-  const formatDate = (isoDate: string | null) => {
-    if (!isoDate) return "Never";
-    return new Date(isoDate).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+  // Format timestamp to readable format
+  const formatTimestamp = (isoDate: string) => {
+    return new Date(isoDate).toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
     });
   };
 
-  // Filter keys based on environment
-  const filteredKeys = apiKeys.filter((key) =>
-    isTestMode ? key.environment === "test" : key.environment === "live"
-  );
+  // Filter logs based on search term and status filter
+  const filteredLogs = logs.filter((log) => {
+    const matchesSearch =
+      log.endpoint.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.apiKeyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.ipAddress.includes(searchTerm);
+
+    if (filter === "all") return matchesSearch;
+    if (filter === "success")
+      return matchesSearch && log.statusCode >= 200 && log.statusCode < 300;
+    if (filter === "error")
+      return matchesSearch && (log.statusCode >= 400 || log.statusCode === 0);
+
+    return matchesSearch;
+  });
+
+  // Get status code color
+  const getStatusColor = (statusCode: number) => {
+    if (statusCode >= 200 && statusCode < 300)
+      return "bg-success-100 dark:bg-success-900/20 text-success-800 dark:text-success-400 border-success-200 dark:border-success-800/30";
+    if (statusCode >= 400 && statusCode < 500)
+      return "bg-warning-100 dark:bg-warning-900/20 text-warning-800 dark:text-warning-400 border-warning-200 dark:border-warning-800/30";
+    if (statusCode >= 500 || statusCode === 0)
+      return "bg-error-100 dark:bg-error-900/20 text-error-800 dark:text-error-400 border-error-200 dark:border-error-800/30";
+    return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700";
+  };
+
+  // Get method color
+  const getMethodColor = (method: string) => {
+    switch (method) {
+      case "GET":
+        return "bg-primary-100 dark:bg-primary-900/20 text-primary-800 dark:text-primary-400 border-primary-200 dark:border-primary-800/30";
+      case "POST":
+        return "bg-success-100 dark:bg-success-900/20 text-success-800 dark:text-success-400 border-success-200 dark:border-success-800/30";
+      case "PUT":
+        return "bg-warning-100 dark:bg-warning-900/20 text-warning-800 dark:text-warning-400 border-warning-200 dark:border-warning-800/30";
+      case "DELETE":
+        return "bg-error-100 dark:bg-error-900/20 text-error-800 dark:text-error-400 border-error-200 dark:border-error-800/30";
+      default:
+        return "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700";
+    }
+  };
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">API Keys</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Manage authentication for your API integrations
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+            API Request Logs
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Monitor recent API calls and their responses
           </p>
         </div>
-        <div className="mt-3 sm:mt-0 flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
-          <div className="flex items-center">
-            <span className="text-sm text-gray-700 mr-2">Mode:</span>
-            <button
-              onClick={() => setIsTestMode(!isTestMode)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                isTestMode ? "bg-gray-400" : "bg-blue-600"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  isTestMode ? "translate-x-1" : "translate-x-6"
-                }`}
-              />
-              <span className="sr-only">
-                {isTestMode ? "Test Mode" : "Live Mode"}
-              </span>
-            </button>
-            <span className="ml-2 text-sm font-medium">
-              {isTestMode ? "Test" : "Live"}
-            </span>
-          </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create API Key
-          </button>
-        </div>
+        <button
+          onClick={fetchLogs}
+          disabled={loading}
+          className="mt-3 sm:mt-0 flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-primary-500 dark:focus:ring-dark-primary-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+        >
+          <RefreshCw
+            className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </button>
       </div>
 
-      <div className="mt-4 bg-white shadow overflow-hidden rounded-lg">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+      <div className="mt-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+        <div className="relative flex-grow">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+          </div>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search endpoints, IP addresses..."
+            className="pl-10 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:ring-primary-500 dark:focus:ring-dark-primary-400 focus:border-primary-500 dark:focus:border-dark-primary-400 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200"
+          />
+        </div>
+        <select
+          value={filter}
+          onChange={(e) =>
+            setFilter(e.target.value as "all" | "success" | "error")
+          }
+          className="px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md shadow-sm focus:ring-primary-500 dark:focus:ring-dark-primary-400 focus:border-primary-500 dark:focus:border-dark-primary-400 transition-colors duration-200"
+        >
+          <option value="all">All Requests</option>
+          <option value="success">Successful (2xx)</option>
+          <option value="error">Errors (4xx/5xx)</option>
+        </select>
+      </div>
+
+      <div className="mt-4 bg-white dark:bg-gray-800 shadow-soft dark:shadow-glass-dark border border-gray-200 dark:border-gray-700 overflow-hidden rounded-lg">
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-800/50">
               <tr>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  Name
+                  Time
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  Type
+                  Method
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  Key
+                  Endpoint
                 </th>
                 <th
                   scope="col"
-                  className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="hidden sm:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  Created
+                  Status
                 </th>
                 <th
                   scope="col"
-                  className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  Expires
+                  Duration
                 </th>
                 <th
                   scope="col"
-                  className="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  Last Used
+                  API Key
                 </th>
                 <th
                   scope="col"
-                  className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="hidden lg:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  Actions
+                  IP Address
+                </th>
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
+                  Details
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredKeys.length === 0 ? (
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {loading ? (
                 <tr>
                   <td
-                    colSpan={7}
-                    className="px-4 py-4 text-center text-gray-500"
+                    colSpan={8}
+                    className="px-4 py-4 text-center text-gray-500 dark:text-gray-400"
                   >
-                    No API keys found. Create your first key using the button
-                    above.
+                    <div className="flex justify-center items-center">
+                      <Clock className="h-5 w-5 mr-2 animate-spin" />
+                      Loading logs...
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredLogs.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-4 text-center text-gray-500 dark:text-gray-400"
+                  >
+                    No logs found matching your filters.
                   </td>
                 </tr>
               ) : (
-                filteredKeys.map((apiKey) => (
-                  <tr key={apiKey.id}>
-                    <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                      <div className="flex items-center">
-                        {apiKey.type === "private" && (
-                          <Shield className="h-4 w-4 text-yellow-500 mr-1" />
-                        )}
-                        {apiKey.name}
-                      </div>
+                filteredLogs.map((log) => (
+                  <tr
+                    key={log.id}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors duration-200"
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {formatTimestamp(log.timestamp)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          apiKey.type === "public"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getMethodColor(
+                          log.method
+                        )}`}
                       >
-                        {apiKey.type}
+                        {log.method}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <span className="font-mono text-xs sm:text-sm">
-                          {showKeys[apiKey.id]
-                            ? apiKey.key
-                            : apiKey.key.substring(0, 10) + "•".repeat(5)}
-                        </span>
-                        <button
-                          onClick={() => toggleKeyVisibility(apiKey.id)}
-                          className="ml-2 text-gray-400 hover:text-gray-600"
-                          title={showKeys[apiKey.id] ? "Hide key" : "Show key"}
-                        >
-                          {showKeys[apiKey.id] ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => copyApiKey(apiKey.id, apiKey.key)}
-                          className="ml-2 text-gray-400 hover:text-gray-600"
-                          title="Copy to clipboard"
-                        >
-                          {copyStatus[apiKey.id] ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100 truncate max-w-xs">
+                      {log.endpoint}
                     </td>
-                    <td className="hidden sm:table-cell px-4 py-4 text-sm text-gray-500">
-                      {formatDate(apiKey.createdAt)}
+                    <td className="hidden sm:table-cell px-4 py-3 whitespace-nowrap text-sm">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
+                          log.statusCode
+                        )}`}
+                      >
+                        {log.statusCode}
+                      </span>
                     </td>
-                    <td className="hidden md:table-cell px-4 py-4 text-sm text-gray-500">
-                      {formatDate(apiKey.expiresAt)}
+                    <td className="hidden md:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {log.duration} ms
                     </td>
-                    <td className="hidden lg:table-cell px-4 py-4 text-sm text-gray-500">
-                      {formatDate(apiKey.lastUsed)}
+                    <td className="hidden lg:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
+                      {log.apiKeyName || log.apiKeyId}
                     </td>
-                    <td className="px-4 py-4 text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => rotateKey(apiKey)}
-                          title="Rotate key"
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <RefreshCcw className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteApiKey(apiKey.id)}
-                          title="Delete key"
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                    <td className="hidden lg:table-cell px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {log.ipAddress}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        className="text-primary-600 dark:text-dark-primary-400 hover:text-primary-900 dark:hover:text-dark-primary-300 transition-colors duration-200"
+                        title="View details"
+                      >
+                        <ArrowUpRight className="h-4 w-4" />
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -369,25 +325,14 @@ const ApiKeysManager: React.FC = () => {
       </div>
 
       <div className="mt-4 px-2">
-        <div className="flex items-start">
-          <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2 mt-0.5" />
-          <p className="text-sm text-gray-500">
-            <strong>Security Note:</strong> Keep your private keys secure. Never
-            commit them to version control or share them in public environments.
-            Rotate your keys regularly for better security.
-          </p>
-        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          <strong className="text-gray-700 dark:text-gray-300">Note:</strong>{" "}
+          Logs are retained for 30 days. For longer retention, export your logs
+          or integrate with a logging service.
+        </p>
       </div>
-
-      {/* Modal for creating a new API key */}
-      <KeyModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleCreateKey}
-        environment={isTestMode ? "test" : "live"}
-      />
     </div>
   );
 };
 
-export default ApiKeysManager;
+export default LogViewer;

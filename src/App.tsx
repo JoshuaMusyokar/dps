@@ -16,41 +16,62 @@ import { store } from "./store";
 import { NotFoundPage } from "./features/error/NotFound";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import Unauthorized from "./features/auth/AuthorizationPage";
+import { ProtectedRoute } from "./features/auth/ProtectedRoute";
+import RBACManagementPage from "./features/RBAC/rbac";
+import RBACPageNew from "./features/RBAC/RBACPageNew";
+import { ThemeProvider } from "./components/layouts/ResponsiveLayout";
+import ProfilePage from "./features/auth/ProfilePage";
+import OnboardingListPage from "./features/MerchantOnBoarding/OnboardingList";
 
 function App() {
   return (
     <Provider store={store}>
-      <Router>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <DashboardLayout>
-                <Dashboard />
-              </DashboardLayout>
-            }
-          />
+      <ThemeProvider>
+        <Router>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Dashboard />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          <Route path="/checkout" element={<PaymentPage />} />
-          <Route path="/unauthorized" element={<Unauthorized />} />
-          <Route
-            path="/business-registration"
-            element={<BusinessRegistrationPage />}
-          />
-          <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/2fa"
-            element={<TwoFactorSetup onComplete={() => {}} userId="joshu" />}
-          />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/api" element={<ApiKeysIntegrationsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/rbac" element={<RBACPage />} />
-          <Route path="/customers" element={<CustomerPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-          {/* <Route path="/kyc" element={<KYCForm />} /> */}
-        </Routes>
-      </Router>
+            <Route path="/checkout" element={<PaymentPage />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route
+              path="/business-registration"
+              element={<BusinessRegistrationPage />}
+            />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route
+              path="/2fa"
+              element={<TwoFactorSetup onComplete={() => {}} userId="joshu" />}
+            />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/onboardings" element={<OnboardingListPage />} />
+            <Route path="/api" element={<ApiKeysIntegrationsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/rbac-1" element={<RBACPage />} />
+            <Route path="/rbac" element={<RBACPageNew />} />
+
+            <Route
+              path="/customers"
+              element={
+                <ProtectedRoute requiredPermission="Manage Users">
+                  <CustomerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFoundPage />} />
+            {/* <Route path="/kyc" element={<KYCForm />} /> */}
+          </Routes>
+        </Router>
+      </ThemeProvider>
     </Provider>
   );
 }

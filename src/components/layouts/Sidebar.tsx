@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import {
   ChartBarIcon,
@@ -16,6 +16,7 @@ import {
   MonitorDot,
   UserCog,
 } from "lucide-react";
+import { useAuth } from "../../hooks"; // Import the useAuth hook
 
 // Define types for our component props and data structures
 type IconComponent = React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -24,31 +25,68 @@ interface NavigationItem {
   path: string;
   name: string;
   icon: IconComponent;
+  requiredPermission?: string; // Permission required to see this item
+  requiredRole?: string; // Role required to see this item
 }
 
 interface NavigationGroups {
   [key: string]: string[];
 }
 
-// Navigation items configuration
+// Navigation items configuration with permission requirements
 const navigationItems: NavigationItem[] = [
-  { path: "/", name: "Dashboard", icon: ChartBarIcon },
-  { path: "/transactions", name: "Transactions", icon: CreditCardIcon },
-  { path: "/customers", name: "Customers", icon: UsersIcon },
-  { path: "/trx-monitor", name: "Transaction Monitoring", icon: MonitorDot },
+  { path: "/", name: "Dashboard", icon: ChartBarIcon }, // Everyone can see dashboard
+  {
+    path: "/transactions",
+    name: "Transactions",
+    icon: CreditCardIcon,
+    requiredPermission: "view_transactions",
+  },
+  {
+    path: "/customers",
+    name: "Customers",
+    icon: UsersIcon,
+    requiredPermission: "view_customers",
+  },
+  {
+    path: "/trx-monitor",
+    name: "Transaction Monitoring",
+    icon: MonitorDot,
+    requiredPermission: "monitor_transactions",
+  },
   {
     path: "/business-registration",
     name: "Merchant Onboarding",
     icon: ClipboardList,
+    requiredPermission: "manage_merchants",
   },
-  { path: "/api", name: "API Keys & Integration", icon: KeyRound },
-  { path: "/setting", name: "Settings", icon: CogIcon },
-  { path: "/rbac", name: "RBAC", icon: UserCog },
-  { path: "/2fa", name: "2FA", icon: Fingerprint },
+  {
+    path: "/api",
+    name: "API Keys & Integration",
+    icon: KeyRound,
+    requiredPermission: "manage_api_keys",
+  },
+  {
+    path: "/setting",
+    name: "Settings",
+    icon: CogIcon,
+    requiredPermission: "manage_settings",
+  },
+  {
+    path: "/rbac",
+    name: "RBAC",
+    icon: UserCog,
+    requiredRole: "admin", // Only admins can manage roles and permissions
+  },
+  {
+    path: "/2fa",
+    name: "2FA",
+    icon: Fingerprint,
+    requiredPermission: "manage_security",
+  },
 ];
 
 // Group navigation items by category
-
 const navigationGroups: NavigationGroups = {
   Main: ["/", "/transactions", "/customers"],
   Management: ["/trx-monitor", "/business-registration"],
@@ -57,7 +95,6 @@ const navigationGroups: NavigationGroups = {
 };
 
 interface SidebarProps {
-  // You can add props if needed, such as initialCollapsed, onSignOut, etc.
   initialCollapsed?: boolean;
   onSignOut?: () => void;
 }
@@ -67,8 +104,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSignOut = () => {}, // Default empty function
 }) => {
   const [isCollapsed, setIsCollapsed] = useState<boolean>(initialCollapsed);
+  const { hasPermission, hasRole } = useAuth(); // Use the auth hook to check permissions
+  const [debug, setDebug] = useState<Array<string>>([]);
+
+  // Add useEffect for debugging
+  useEffect(() => {
+    console.log("Debug info:", debug);
+  }, [debug]);
 
   const toggleSidebar = (): void => setIsCollapsed(!isCollapsed);
+
+  // Function to check if the user has access to a navigation item
+  const hasAccessToNavItem = (item: NavigationItem): boolean => {
+    // If no permission or role is required, allow access
+    if (!item.requiredPermission && !item.requiredRole) {
+      return true;
+    }
+
+    // Check permission if required
+    if (item.requiredPermission) {
+      const hasPermResult = hasPermission(item.requiredPermission);
+      console.log(
+        `Permission check for ${item.name}: ${item.requiredPermission} = ${hasPermResult}`
+      );
+      setDebug((prev) => [
+        ...prev,
+        `Permission ${item.requiredPermission} = ${hasPermResult}`,
+      ]);
+
+      if (!hasPermResult) return false;
+    }
+
+    // Check role if required
+    if (item.requiredRole) {
+      const hasRoleResult = hasRole(item.requiredRole);
+      console.log(
+        `Role check for ${item.name}: ${item.requiredRole} = ${hasRoleResult}`
+      );
+      setDebug((prev) => [
+        ...prev,
+        `Role ${item.requiredRole} = ${hasRoleResult}`,
+      ]);
+
+      if (!hasRoleResult) return false;
+    }
+
+    return true;
+  };
 
   // Function to get the group name for a path
   const getGroupForPath = (path: string): string => {
@@ -78,13 +160,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return "Other";
   };
 
-  // Group the navigation items
-  const groupedNavItems: Record<string, NavigationItem[]> = {};
-  navigationItems.forEach((item) => {
-    const group = getGroupForPath(item.path);
-    if (!groupedNavItems[group]) groupedNavItems[group] = [];
-    groupedNavItems[group].push(item);
-  });
+  // Filter and group the navigation items based on permissions
+  const groupedNavItems = React.useMemo(() => {
+    console.log("Computing navigation items");
+    const groupedItems: Record<string, NavigationItem[]> = {};
+
+    navigationItems.forEach((item) => {
+      console.log(`Checking access for nav item: ${item.name}`);
+
+      // Only include items the user has access to
+      const access = hasAccessToNavItem(item);
+      console.log(`Access result for ${item.name}: ${access}`);
+
+      if (access) {
+        const group = getGroupForPath(item.path);
+        if (!groupedItems[group]) groupedItems[group] = [];
+        groupedItems[group].push(item);
+      }
+    });
+
+    // Filter out empty groups
+    return Object.fromEntries(
+      Object.entries(groupedItems).filter(([_, items]) => items.length > 0)
+    );
+  }, [hasPermission, hasRole]); // Re-compute when permission/role checking functions change
 
   return (
     <div

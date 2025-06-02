@@ -18,7 +18,7 @@ export const PaymentForm = () => {
     formState: { errors },
     setValue,
   } = useForm<PaymentDetails>({
-    resolver: zodResolver(paymentSchema),
+    // resolver: zodResolver(paymentSchema),
     defaultValues: {
       method: "card",
       currency: "USD",
@@ -32,7 +32,7 @@ export const PaymentForm = () => {
     // Here you would normally call your payment API
   };
   const methods = useForm<PaymentDetails>({
-    resolver: zodResolver(paymentSchema),
+    // resolver: zodResolver(paymentSchema),
     defaultValues: {
       method: "card",
       currency: "USD",

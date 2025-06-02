@@ -9,14 +9,25 @@ import {
   X,
   ChevronRight,
   ChevronLeft,
-  Home,
+  Sun,
+  Moon,
+  Palette,
+  ClipboardCheck,
 } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../store";
-import { useNavigate, NavLink } from "react-router-dom";
+import { useNavigate, NavLink, useLocation } from "react-router-dom";
 import { logout } from "../../store/slices/auth-slice";
-import { useState, useEffect } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  createContext,
+  useContext,
+} from "react";
 import Avatar from "../ui/Avatar";
+import { useEnhancedAuth } from "../../hooks"; // Updated import
 
 // Import all your sidebar icons
 import {
@@ -34,45 +45,167 @@ import {
   UserCog,
 } from "lucide-react";
 
-// Define types for our component props and data structures
+// Theme Context (unchanged)
+interface ThemeContextType {
+  theme: "light" | "dark";
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("theme");
+      return (saved as "light" | "dark") || "light";
+    }
+    return "light";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("theme", theme);
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error("useTheme must be used within a ThemeProvider");
+  }
+  return context;
+};
+
+// Enhanced NavigationItem interface with multiple permissions/roles support
 type IconComponent = React.ComponentType<React.SVGProps<SVGSVGElement>>;
 
 interface NavigationItem {
   path: string;
   name: string;
   icon: IconComponent;
+  // Support for multiple permissions (OR logic)
+  requiredPermissions?: string[];
+  // Support for multiple roles (OR logic)
+  requiredRoles?: string[];
+  // Support for actions
+  requiredAction?: string;
+  // Support for route-based access
+  routeAccess?: string;
+  badge?: string;
+  // Legacy support (will be converted to arrays)
+  requiredPermission?: string;
+  requiredRole?: string;
 }
 
 interface NavigationGroups {
   [key: string]: string[];
 }
 
-// Navigation items configuration
+// Enhanced navigation items configuration with multiple permissions/roles
 const navigationItems: NavigationItem[] = [
-  { path: "/", name: "Dashboard", icon: ChartBarIcon },
-  { path: "/transactions", name: "Transactions", icon: CreditCardIcon },
-  { path: "/customers", name: "Customers", icon: UsersIcon },
-  { path: "/trx-monitor", name: "Transaction Monitoring", icon: MonitorDot },
+  {
+    path: "/",
+    name: "Dashboard",
+    icon: ChartBarIcon,
+  },
+  {
+    path: "/transactions",
+    name: "Transactions",
+    icon: CreditCardIcon,
+    requiredPermissions: ["view_transactions", "manage_transactions"],
+    requiredRoles: ["Administrator", "Transaction Manager"],
+    requiredAction: "read",
+    badge: "New",
+  },
+  {
+    path: "/customers",
+    name: "Customers",
+    icon: UsersIcon,
+    requiredPermissions: ["Manage Users", "view_customers"],
+    requiredAction: "read",
+  },
+  {
+    path: "/trx-monitor",
+    name: "Transaction Monitoring",
+    icon: MonitorDot,
+    requiredPermissions: ["monitor_transactions", "view_transactions"],
+    requiredRoles: ["Administrator", "Monitor"],
+    requiredAction: "read",
+  },
   {
     path: "/business-registration",
     name: "Merchant Onboarding",
     icon: ClipboardList,
+    requiredPermissions: ["manage_merchants", "onboard_merchants"],
+    requiredRoles: ["Onboarding", "Administrator"],
+    requiredAction: "write",
   },
-  { path: "/api", name: "API Keys & Integration", icon: KeyRound },
-  { path: "/settings", name: "Settings", icon: CogIcon },
-  { path: "/rbac", name: "RBAC", icon: UserCog },
-  { path: "/2fa", name: "2FA", icon: Fingerprint },
+  {
+    path: "/onboardings",
+    name: "Onboarding List",
+    icon: ClipboardCheck,
+    requiredPermissions: ["manage_merchants"],
+    requiredRoles: ["Administrator"],
+    requiredAction: "read",
+  },
+  {
+    path: "/api",
+    name: "API Keys & Integration",
+    icon: KeyRound,
+    requiredPermissions: ["Manage API Keys", "view_api_keys"],
+    requiredRoles: ["Administrator", "Developer"],
+    requiredAction: "read",
+  },
+  {
+    path: "/settings",
+    name: "Settings",
+    icon: CogIcon,
+    requiredPermissions: ["manage_settings", "view_settings"],
+    requiredRoles: ["admin", "Administrator"],
+    requiredAction: "read",
+  },
+  {
+    path: "/rbac-1",
+    name: "RBAC v1",
+    icon: UserCog,
+    requiredPermissions: ["Manage API Keys", "manage_rbac"],
+    requiredRoles: ["Administrator", "Security Admin"],
+  },
+  {
+    path: "/rbac",
+    name: "RBAC",
+    icon: UserCog,
+    requiredPermissions: ["Manage API Keys", "manage_rbac"],
+    requiredRoles: ["Administrator", "Security Admin"],
+  },
+  {
+    path: "/2fa",
+    name: "2FA",
+    icon: Fingerprint,
+    requiredPermissions: ["manage_security", "view_security"],
+    requiredRoles: ["Administrator", "Security Admin"],
+    requiredAction: "read",
+  },
 ];
 
-// Group navigation items by category
+// Group navigation items by category (unchanged)
 const navigationGroups: NavigationGroups = {
   Main: ["/", "/transactions", "/customers"],
   Management: ["/trx-monitor", "/business-registration"],
-  System: ["/api", "/setting", "/rbac"],
+  System: ["/api", "/settings", "/rbac", "/rbac-1"],
   Security: ["/2fa"],
 };
 
-// Helper function to get group for path
 const getGroupForPath = (path: string): string => {
   for (const [group, paths] of Object.entries(navigationGroups)) {
     if (paths.includes(path)) return group;
@@ -80,15 +213,162 @@ const getGroupForPath = (path: string): string => {
   return "Other";
 };
 
-// Group the navigation items
-const groupedNavItems: Record<string, NavigationItem[]> = {};
-navigationItems.forEach((item) => {
-  const group = getGroupForPath(item.path);
-  if (!groupedNavItems[group]) groupedNavItems[group] = [];
-  groupedNavItems[group].push(item);
-});
+// Enhanced Glassmorphism Button Component (unchanged)
+const GlassButton = ({
+  children,
+  onClick,
+  className = "",
+  variant = "default",
+  ...props
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  className?: string;
+  variant?: "default" | "primary" | "danger";
+  [key: string]: any;
+}) => {
+  const baseClasses =
+    "relative overflow-hidden backdrop-blur-lg border transition-all duration-300 transform hover:scale-105 active:scale-95";
 
-// Combined layout component with responsive behavior
+  const variants = {
+    default:
+      "bg-white/10 dark:bg-white/5 border-white/20 dark:border-white/10 hover:bg-white/20 dark:hover:bg-white/10",
+    primary:
+      "bg-gradient-to-r from-primary-500/20 to-accent-500/20 border-primary-300/30 dark:border-primary-400/30 hover:from-primary-500/30 hover:to-accent-500/30",
+    danger: "bg-red-500/10 border-red-300/30 hover:bg-red-500/20",
+  };
+
+  return (
+    <button
+      className={`${baseClasses} ${variants[variant]} ${className}`}
+      onClick={onClick}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+// Enhanced Navigation Item Component (unchanged)
+const NavItem = ({
+  item,
+  isActive,
+  isCollapsed,
+  isMobileView,
+  onClick,
+}: {
+  item: NavigationItem;
+  isActive: boolean;
+  isCollapsed: boolean;
+  isMobileView: boolean;
+  onClick?: () => void;
+}) => {
+  const Icon = item.icon;
+
+  return (
+    <NavLink
+      to={item.path}
+      onClick={onClick}
+      className={`
+        group relative flex items-center px-3 py-2.5 text-sm font-medium rounded-xl 
+        transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]
+        ${
+          isActive
+            ? "bg-gradient-to-r from-primary-500 to-accent-500 text-white shadow-lg shadow-primary-500/25 dark:shadow-primary-400/20"
+            : "text-gray-700 dark:text-gray-300 hover:bg-white/50 dark:hover:bg-white/5 hover:text-primary-600 dark:hover:text-primary-400"
+        }
+        ${isCollapsed && !isMobileView ? "justify-center" : ""}
+      `}
+      title={isCollapsed && !isMobileView ? item.name : ""}
+    >
+      <div className="relative">
+        <Icon
+          className={`${
+            isCollapsed && !isMobileView ? "mx-auto" : "mr-3"
+          } h-5 w-5 transition-transform duration-300 group-hover:scale-110`}
+        />
+        {isActive && (
+          <div className="absolute -inset-1 bg-white/20 rounded-lg blur animate-pulse" />
+        )}
+      </div>
+
+      {(!isCollapsed || isMobileView) && (
+        <div className="flex items-center justify-between flex-1">
+          <span className="truncate">{item.name}</span>
+          {item.badge && (
+            <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-accent-500/20 text-accent-700 dark:text-accent-300 rounded-full">
+              {item.badge}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-primary-500/0 via-primary-500/5 to-accent-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    </NavLink>
+  );
+};
+
+// Enhanced access control function that supports multiple permissions and roles
+const checkNavigationAccess = (
+  item: NavigationItem,
+  hasAccess: (options: any) => boolean,
+  hasPermissionWithAction: (permission: string, action?: string) => boolean,
+  hasRoleAccess: (role: string) => boolean
+): boolean => {
+  // If no requirements, allow access
+  if (
+    !item.requiredPermissions &&
+    !item.requiredRoles &&
+    !item.requiredPermission &&
+    !item.requiredRole &&
+    !item.routeAccess
+  ) {
+    console.log("here 1");
+    return true;
+  }
+
+  console.log("here 2");
+  // Convert legacy single permission/role to arrays for consistency
+  const permissions =
+    item.requiredPermissions ||
+    (item.requiredPermission ? [item.requiredPermission] : []);
+  const roles =
+    item.requiredRoles || (item.requiredRole ? [item.requiredRole] : []);
+
+  // Check if user has ANY of the required permissions (OR logic)
+  const hasAnyPermission =
+    permissions.length === 0 ||
+    permissions.some((permission) =>
+      hasPermissionWithAction(permission, item.requiredAction)
+    );
+
+  // Check if user has ANY of the required roles (OR logic)
+  const hasAnyRole =
+    roles.length === 0 || roles.some((role) => hasRoleAccess(role));
+
+  // Check route access if specified
+  // const hasRoutePermission =
+  //   !item.routeAccess ||
+  //   hasAccess({
+  //     route: item.routeAccess,
+  //     action: item.requiredAction,
+  //   });
+
+  // Grant access if user has ANY required permission OR ANY required role OR route access
+  // This is the key change: OR logic instead of AND logic
+  const hasPermissionAccess = hasAnyPermission;
+  const hasRoleBasedAccess = hasAnyRole;
+  console.log(
+    "check",
+    hasPermissionAccess,
+    hasRoleBasedAccess
+    // hasRoutePermission
+  );
+
+  return hasPermissionAccess || hasRoleBasedAccess;
+};
+
+// Main layout component with enhanced access control
 export const ResponsiveLayout = ({
   children,
 }: {
@@ -97,13 +377,19 @@ export const ResponsiveLayout = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { user, isAuthenticated } = useSelector(
     (state: RootState) => state.auth
   );
+
+  // Use enhanced auth hook with auto-sync and multiple permission support
+  const { hasAccess, hasPermissionWithAction, hasRoleAccess } =
+    useEnhancedAuth();
 
   useEffect(() => {
     const handleResize = () => {
@@ -113,7 +399,7 @@ export const ResponsiveLayout = ({
       }
     };
 
-    handleResize(); // Set initial state
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -127,34 +413,77 @@ export const ResponsiveLayout = ({
   const toggleSidebar = () => setIsCollapsed(!isCollapsed);
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
+  // Enhanced access checking function with multiple permissions/roles support
+  const hasAccessToNavItem = useCallback(
+    (item: NavigationItem): boolean => {
+      return checkNavigationAccess(
+        item,
+        hasAccess,
+        hasPermissionWithAction,
+        hasRoleAccess
+      );
+    },
+    [hasAccess, hasPermissionWithAction, hasRoleAccess]
+  );
+
+  // Group navigation items with enhanced access control
+  const groupedNavItems = useMemo(() => {
+    const groupedItems: Record<string, NavigationItem[]> = {};
+
+    navigationItems.forEach((item) => {
+      if (hasAccessToNavItem(item)) {
+        const group = getGroupForPath(item.path);
+        if (!groupedItems[group]) groupedItems[group] = [];
+        groupedItems[group].push(item);
+      }
+    });
+
+    // Filter out empty groups
+    return Object.fromEntries(
+      Object.entries(groupedItems).filter(([_, items]) => items.length > 0)
+    );
+  }, [hasAccessToNavItem]);
+
+  // Debug: Log accessible items for troubleshooting
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("User permissions:", user);
+      console.log("Accessible navigation items:", Object.keys(groupedNavItems));
+      console.log(
+        "Total accessible items:",
+        Object.values(groupedNavItems).flat().length
+      );
+    }
+  }, [groupedNavItems, user]);
+
   return (
-    <div className="flex h-screen w-full bg-gray-50">
-      {/* Sidebar - Hidden on mobile unless menu is open */}
+    <div className="flex h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-500">
+      {/* Sidebar */}
       <div
         className={`
-            ${
-              isMobileView
-                ? "fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out"
-                : "relative"
-            }
-            ${
-              isMobileView && !isMobileMenuOpen
-                ? "-translate-x-full"
-                : "translate-x-0"
-            }
-            ${
-              !isMobileView && isCollapsed
-                ? "w-20"
-                : !isMobileView
-                ? "w-64"
-                : "w-full md:w-64"
-            }
-          `}
+          ${
+            isMobileView
+              ? "fixed inset-0 z-50 transform transition-all duration-500 ease-out"
+              : "relative"
+          }
+          ${
+            isMobileView && !isMobileMenuOpen
+              ? "-translate-x-full opacity-0"
+              : "translate-x-0 opacity-100"
+          }
+          ${
+            !isMobileView && isCollapsed
+              ? "w-20"
+              : !isMobileView
+              ? "w-72"
+              : "w-full md:w-72"
+          }
+        `}
       >
-        {/* Overlay for mobile */}
+        {/* Mobile Overlay */}
         {isMobileView && isMobileMenuOpen && (
           <div
-            className="absolute inset-0 bg-gray-600 bg-opacity-75"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
             onClick={toggleMobileMenu}
           />
         )}
@@ -164,14 +493,14 @@ export const ResponsiveLayout = ({
           className={`
             ${
               isMobileView
-                ? "absolute inset-y-0 left-0 max-w-xs w-full"
+                ? "absolute inset-y-0 left-0 max-w-sm w-full"
                 : "h-full"
             }
-            flex flex-col bg-white border-r border-gray-200 shadow-sm
+            flex flex-col bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-r border-white/20 dark:border-gray-700/50 shadow-2xl
           `}
         >
           {/* Sidebar Header */}
-          <div className="flex items-center justify-between px-4 py-5">
+          <div className="flex items-center justify-between px-6 py-6 border-b border-white/10 dark:border-gray-700/50">
             <div
               className={`flex items-center ${
                 isCollapsed && !isMobileView
@@ -179,229 +508,248 @@ export const ResponsiveLayout = ({
                   : "justify-start"
               }`}
             >
-              <h1 className="text-xl font-bold text-indigo-600">
-                {isCollapsed && !isMobileView ? "D" : "DPS"}
-              </h1>
+              <div className="relative">
+                <div className="absolute -inset-2 bg-gradient-to-r from-primary-500 to-accent-500 rounded-xl blur opacity-20 animate-pulse" />
+                <h1 className="relative text-2xl font-bold bg-gradient-to-r from-primary-600 to-accent-600 dark:from-primary-400 dark:to-accent-400 bg-clip-text text-transparent">
+                  {isCollapsed && !isMobileView ? "D" : "DPS"}
+                </h1>
+              </div>
             </div>
 
-            {/* Close button only on mobile */}
             {isMobileView ? (
-              <button
+              <GlassButton
                 onClick={toggleMobileMenu}
-                className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none"
+                className="p-2 rounded-xl"
+                variant="default"
               >
-                <X className="h-6 w-6" />
-              </button>
+                <X className="h-5 w-5" />
+              </GlassButton>
             ) : (
-              <button
+              <GlassButton
                 onClick={toggleSidebar}
-                className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none"
+                className="p-2 rounded-xl"
+                variant="default"
               >
                 {isCollapsed ? (
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 ) : (
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 )}
-              </button>
+              </GlassButton>
             )}
           </div>
 
-          {/* Navigation Section */}
-          <div className="h-0 flex-1 flex flex-col pt-2 pb-4 overflow-y-auto scrollbar-thin">
-            <nav className="flex-1 px-2 space-y-6">
+          {/* Navigation Section with Enhanced Access Control */}
+          <div className="flex-1 px-4 py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-primary-200 dark:scrollbar-thumb-gray-600">
+            <nav className="space-y-8">
               {Object.entries(groupedNavItems).map(([group, items]) => (
-                <div key={group} className="space-y-1">
+                <div key={group} className="space-y-2">
                   {(!isCollapsed || isMobileView) && (
-                    <p className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      {group}
-                    </p>
+                    <div className="flex items-center px-3 mb-4">
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
+                      <p className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        {group}
+                      </p>
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent" />
+                    </div>
                   )}
-                  {items.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.path}
-                        to={item.path}
-                        onClick={isMobileView ? toggleMobileMenu : undefined}
-                        className={({ isActive }) =>
-                          `group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-all duration-150
-                            ${
-                              isActive
-                                ? "bg-indigo-50 text-indigo-700 border-l-4 border-indigo-600"
-                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                            }
-                            ${
-                              isCollapsed && !isMobileView
-                                ? "justify-center"
-                                : ""
-                            }`
-                        }
-                        title={isCollapsed && !isMobileView ? item.name : ""}
-                      >
-                        <Icon
-                          className={`${
-                            isCollapsed && !isMobileView ? "mx-auto" : "mr-3"
-                          } h-5 w-5`}
-                        />
-                        {(!isCollapsed || isMobileView) && (
-                          <span>{item.name}</span>
-                        )}
-                      </NavLink>
-                    );
-                  })}
+                  {items.map((item) => (
+                    <NavItem
+                      key={item.path}
+                      item={item}
+                      isActive={location.pathname === item.path}
+                      isCollapsed={isCollapsed}
+                      isMobileView={isMobileView}
+                      onClick={isMobileView ? toggleMobileMenu : undefined}
+                    />
+                  ))}
                 </div>
               ))}
             </nav>
           </div>
 
           {/* Sidebar Footer */}
-          <div className="flex-shrink-0 flex border-t border-gray-200 p-4">
-            <button
-              className={`flex-shrink-0 w-full group block ${
+          <div className="flex-shrink-0 p-4 border-t border-white/10 dark:border-gray-700/50">
+            <GlassButton
+              onClick={handleLogout}
+              className={`w-full p-3 rounded-xl flex items-center ${
                 isCollapsed && !isMobileView ? "justify-center" : ""
               }`}
-              onClick={handleLogout}
-              aria-label="Sign out"
+              variant="danger"
             >
-              <div
-                className={`flex items-center ${
-                  isCollapsed && !isMobileView ? "justify-center" : ""
-                }`}
-              >
-                <div>
-                  <ArrowLeftOnRectangleIcon className="h-5 w-5 text-gray-500 group-hover:text-gray-700" />
-                </div>
-                {(!isCollapsed || isMobileView) && (
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                      Sign out
-                    </p>
-                  </div>
-                )}
-              </div>
-            </button>
+              <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+              {(!isCollapsed || isMobileView) && (
+                <span className="ml-3 font-medium">Sign out</span>
+              )}
+            </GlassButton>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Rest remains the same */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Topbar */}
-        <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-          <div className="container flex h-16 items-center justify-between px-4">
-            {/* Left Side - Title and Mobile Menu Button */}
-            <div className="flex items-center space-x-4">
+        {/* Enhanced Mobile-First Responsive Topbar */}
+        <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 border-b border-white/20 dark:border-gray-700/50 shadow-lg">
+          <div className="flex h-16 sm:h-18 items-center justify-between px-3 sm:px-4 md:px-6">
+            {/* Left Side - Mobile First */}
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0">
+              {/* Mobile Menu Button */}
               {isMobileView && (
-                <button
+                <GlassButton
                   onClick={toggleMobileMenu}
-                  className="p-2 -ml-2 rounded-md text-gray-500 hover:text-gray-900 focus:outline-none"
+                  className="p-2 rounded-xl flex-shrink-0"
+                  variant="default"
                 >
-                  <Menu className="h-6 w-6" />
-                </button>
+                  <Menu className="h-5 w-5" />
+                </GlassButton>
               )}
-              <h1 className="text-lg font-medium text-gray-900">Dashboard</h1>
+
+              {/* Title Section - Responsive */}
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent truncate">
+                  {isMobileView ? "DPS" : "Dashboard"}
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate hidden sm:block">
+                  Welcome back, {user?.first_name || "User"}
+                </p>
+              </div>
             </div>
 
-            {/* Right Side - Actions */}
-            <div className="flex items-center gap-4">
-              {/* Search - Only visible on larger screens */}
-              <div className="relative hidden md:block">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            {/* Right Side - Mobile Optimized */}
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3 flex-shrink-0">
+              {/* Desktop Search Bar */}
+              <div className="relative hidden lg:block">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Search className="h-4 w-4 text-gray-400" />
                 </div>
                 <input
                   type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Search..."
+                  className="w-64 xl:w-80 pl-11 pr-4 py-3 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg border border-white/20 dark:border-gray-600/30 rounded-2xl text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-300"
+                  placeholder="Search anything..."
                 />
               </div>
 
-              {/* Mobile search button */}
-              {isMobileView && (
-                <button className="p-2 rounded-full hover:bg-gray-100">
-                  <Search className="h-5 w-5" />
-                </button>
-              )}
+              {/* Mobile Search Button */}
+              <GlassButton
+                className="p-2 sm:p-3 rounded-xl lg:hidden"
+                variant="default"
+              >
+                <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+              </GlassButton>
+
+              {/* Theme Toggle */}
+              <GlassButton
+                onClick={toggleTheme}
+                className="p-2 sm:p-3 rounded-xl"
+                variant="default"
+              >
+                {theme === "light" ? (
+                  <Moon className="h-4 w-4 sm:h-5 sm:w-5" />
+                ) : (
+                  <Sun className="h-4 w-4 sm:h-5 sm:w-5" />
+                )}
+              </GlassButton>
 
               {/* Notifications */}
-              <button className="p-2 rounded-full hover:bg-gray-100 relative">
-                <Bell className="h-5 w-5" />
-                <span className="sr-only">Notifications</span>
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
-              </button>
+              <GlassButton
+                className="p-2 sm:p-3 rounded-xl relative"
+                variant="default"
+              >
+                <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+                <div className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-gradient-to-r from-red-400 to-red-600 rounded-full animate-pulse" />
+              </GlassButton>
 
-              {/* User dropdown */}
+              {/* User Menu */}
               {isAuthenticated ? (
                 <div className="relative">
-                  <button
+                  <GlassButton
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="relative h-10 w-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                    className="p-1.5 sm:p-2 rounded-xl"
+                    variant="primary"
                   >
-                    <Avatar user={user} size="lg" />
-                  </button>
+                    <Avatar user={user} size={isMobileView ? "md" : "lg"} />
+                  </GlassButton>
 
+                  {/* Mobile-Optimized Dropdown */}
                   {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none z-50">
-                      <div className="px-4 py-3">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {user?.first_name || "User"}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {user?.email || "user@example.com"}
-                        </p>
+                    <>
+                      {/* Mobile Backdrop */}
+                      {isMobileView && (
+                        <div
+                          className="fixed inset-0 bg-black/20 z-40"
+                          onClick={() => setIsDropdownOpen(false)}
+                        />
+                      )}
+
+                      <div
+                        className={`
+                absolute right-0 mt-3 rounded-2xl shadow-2xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl ring-1 ring-black/5 dark:ring-white/10 divide-y divide-gray-100 dark:divide-gray-700 z-50 transform transition-all duration-300 scale-100 opacity-100
+                ${isMobileView ? "w-56" : "w-64"}
+              `}
+                      >
+                        <div className="p-3 sm:p-4">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {user?.first_name || "User"}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {user?.email || "user@example.com"}
+                          </p>
+                        </div>
+                        <div className="py-1 sm:py-2">
+                          <button
+                            onClick={() => {
+                              navigate("/settings");
+                              setIsDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-3 sm:px-4 py-2 sm:py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center transition-colors duration-200"
+                          >
+                            <Settings className="mr-3 h-4 w-4" />
+                            <span>Settings</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleLogout();
+                              setIsDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-3 sm:px-4 py-2 sm:py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center transition-colors duration-200"
+                          >
+                            <LogOut className="mr-3 h-4 w-4" />
+                            <span>Log out</span>
+                          </button>
+                        </div>
                       </div>
-                      <div className="py-1">
-                        <button
-                          onClick={() => {
-                            navigate("/settings");
-                            setIsDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                        >
-                          <Settings className="mr-2 h-4 w-4" />
-                          <span>Settings</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleLogout();
-                            setIsDropdownOpen(false);
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          <span>Log out</span>
-                        </button>
-                      </div>
-                    </div>
+                    </>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center">
-                  {/* On mobile, show simplified login buttons */}
+                <div className="flex items-center gap-2 sm:gap-3">
                   {isMobileView ? (
-                    <button
+                    <GlassButton
                       onClick={() => navigate("/login")}
-                      className="p-2 rounded-md hover:bg-gray-100"
+                      className="p-2 sm:p-3 rounded-xl"
+                      variant="primary"
                     >
-                      <LogIn className="h-5 w-5" />
-                    </button>
+                      <LogIn className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </GlassButton>
                   ) : (
-                    <div className="flex items-center space-x-2">
-                      <button
+                    <>
+                      <GlassButton
                         onClick={() => navigate("/login")}
-                        className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+                        className="px-3 sm:px-4 py-2 rounded-xl flex items-center text-sm"
+                        variant="default"
                       >
                         <LogIn className="mr-2 h-4 w-4" />
                         Sign In
-                      </button>
-                      <button
+                      </GlassButton>
+                      <GlassButton
                         onClick={() => navigate("/register")}
-                        className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+                        className="px-3 sm:px-4 py-2 rounded-xl flex items-center text-sm"
+                        variant="primary"
                       >
                         <UserPlus className="mr-2 h-4 w-4" />
                         Sign Up
-                      </button>
-                    </div>
+                      </GlassButton>
+                    </>
                   )}
                 </div>
               )}
@@ -410,22 +758,10 @@ export const ResponsiveLayout = ({
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-4 md:p-6 bg-gray-50">
-          {children}
+        <main className="flex-1 overflow-auto p-6 md:p-8">
+          <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>
     </div>
   );
 };
-
-// Usage example:
-// import { ResponsiveLayout } from './path/to/ResponsiveLayout';
-//
-// function App() {
-//   return (
-//     <ResponsiveLayout>
-//       {/* Your page content goes here */}
-//       <h1>Hello World</h1>
-//     </ResponsiveLayout>
-//   );
-// }

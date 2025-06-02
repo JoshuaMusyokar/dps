@@ -4,10 +4,12 @@ import { Topbar } from "./Topbar";
 import { ChildProcess } from "child_process";
 import { ReactNode } from "react";
 import { ResponsiveLayout } from "./ResponsiveLayout";
+import FlashMessages from "../../features/ntf/FlashMessages";
 
 export const DashboardLayout = ({ children }: { children: ReactNode }) => {
   return (
     <div className="flex h-screen bg-gray-50">
+      <FlashMessages />
       <ResponsiveLayout>{children}</ResponsiveLayout>
       {/* <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">

@@ -7,9 +7,9 @@ export const rtkQueryErrorLogger: Middleware = () => (next) => (action) => {
       error?: string;
     };
 
-    console.error("RTK Error:", payload);
+    console.log("RTK Error:", payload);
 
-    if (payload.status === "FETCH_ERROR") {
+    if (payload.status === 500) {
       console.warn("Network/API connection failed.");
       // Optional: trigger a toast, logout, etc.
     }

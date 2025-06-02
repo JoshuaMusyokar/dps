@@ -35,13 +35,10 @@ export const TransactionFilters = ({
   });
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="bg-white p-4 rounded-lg shadow"
-    >
+    <form onSubmit={handleSubmit(onSubmit)} className="mt-4">
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Start Date
           </label>
           <Controller
@@ -54,14 +51,21 @@ export const TransactionFilters = ({
                 selectsStart
                 startDate={field.value}
                 endDate={control._formValues.endDate}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:focus:border-dark-primary-400 dark:focus:ring-dark-primary-400 sm:text-sm transition-colors duration-200"
+                calendarClassName="dark:bg-gray-800 dark:border-gray-600"
+                dayClassName={(date) =>
+                  "dark:text-gray-200 hover:bg-primary-100 dark:hover:bg-dark-primary-900/30"
+                }
+                monthClassName={() => "dark:text-gray-200"}
+                timeClassName={() => "dark:text-gray-200"}
+                weekDayClassName={() => "dark:text-gray-400"}
               />
             )}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             End Date
           </label>
           <Controller
@@ -75,19 +79,26 @@ export const TransactionFilters = ({
                 startDate={control._formValues.startDate}
                 endDate={field.value}
                 minDate={control._formValues.startDate}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:focus:border-dark-primary-400 dark:focus:ring-dark-primary-400 sm:text-sm transition-colors duration-200"
+                calendarClassName="dark:bg-gray-800 dark:border-gray-600"
+                dayClassName={(date) =>
+                  "dark:text-gray-200 hover:bg-primary-100 dark:hover:bg-dark-primary-900/30"
+                }
+                monthClassName={() => "dark:text-gray-200"}
+                timeClassName={() => "dark:text-gray-200"}
+                weekDayClassName={() => "dark:text-gray-400"}
               />
             )}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Status
           </label>
           <select
             {...register("status")}
-            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:focus:border-dark-primary-400 dark:focus:ring-dark-primary-400 sm:text-sm transition-colors duration-200"
           >
             <option value="">All</option>
             <option value="successful">Successful</option>
@@ -98,12 +109,12 @@ export const TransactionFilters = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Payment Method
           </label>
           <select
             {...register("paymentMethod")}
-            className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:focus:border-dark-primary-400 dark:focus:ring-dark-primary-400 sm:text-sm transition-colors duration-200"
           >
             <option value="">All</option>
             <option value="card">Card</option>
@@ -115,10 +126,41 @@ export const TransactionFilters = ({
         <div className="flex items-end">
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            className="w-full bg-primary-600 dark:bg-dark-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 dark:hover:bg-dark-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-dark-primary-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
           >
             Apply Filters
           </button>
+        </div>
+      </div>
+
+      {/* Amount Range Filters (Optional - can be added) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Min Amount ($)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            {...register("minAmount", { valueAsNumber: true })}
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:focus:border-dark-primary-400 dark:focus:ring-dark-primary-400 sm:text-sm transition-colors duration-200"
+            placeholder="0.00"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Max Amount ($)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            {...register("maxAmount", { valueAsNumber: true })}
+            className="w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:focus:border-dark-primary-400 dark:focus:ring-dark-primary-400 sm:text-sm transition-colors duration-200"
+            placeholder="No limit"
+          />
         </div>
       </div>
     </form>

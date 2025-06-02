@@ -15,6 +15,7 @@ interface FlashMessage {
 
 const FlashMessages: React.FC = () => {
   const messages = useSelector((state: RootState) => state.flash.messages);
+  console.log("Messages", messages);
   const dispatch = useDispatch();
   const [exiting, setExiting] = useState<Record<string, boolean>>({});
 

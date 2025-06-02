@@ -12,36 +12,38 @@ export const Dashboard = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500 dark:border-dark-primary-400"></div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard Overview</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        Dashboard Overview
+      </h1>
 
       <OverviewCards data={stats} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-soft dark:shadow-glass-dark border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
             Revenue Overview
           </h2>
           <RevenueChart data={revenueData} />
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-soft dark:shadow-glass-dark border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
             Payment Methods
           </h2>
           <PaymentMethodsChart data={stats.paymentMethods} />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-soft dark:shadow-glass-dark border border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
             Transaction Filters
           </h2>
           <TransactionFilters onSubmit={applyFilters} />
@@ -49,10 +51,10 @@ export const Dashboard = () => {
 
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
               Recent Transactions
             </h2>
-            <button className="text-sm text-indigo-600 hover:text-indigo-800">
+            <button className="text-sm text-primary-600 dark:text-dark-primary-400 hover:text-primary-800 dark:hover:text-dark-primary-300 transition-colors duration-200">
               View All
             </button>
           </div>

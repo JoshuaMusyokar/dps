@@ -5,10 +5,12 @@ import { flashReducer } from "./slices/flash-slice";
 import { rtkQueryErrorLogger } from "./middlewares";
 import { registrationReducer } from "./slices/business-registration";
 import { settingsReducer } from "./slices/settings-slice";
+import { rbacReducer } from "./slices/rbac-slice";
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    rbac: rbacReducer,
     registration: registrationReducer,
     flash: flashReducer,
     settings: settingsReducer,
